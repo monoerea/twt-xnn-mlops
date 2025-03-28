@@ -12,8 +12,13 @@ class Scraper():
             print(i._json)
         return user
 
-def main():
-    users = [1464599533,1435309448,19932466,940132086,1945343251,2772953185,2683063328,513001579,162572003,826306403,16641565,2756873076,486160284,18746944,2323141220,2793171236,18623405,171848975,2549103608,36790442,2835488103,1043436650,2837972170]
+
+def bot_user_ids():
+    users = pd.read_csv("data/raw/label.csv")
+    users.head(10)
+    users["id"] = users["id"].str.removeprefix("u").astype(int)
+    return users["id"][users['label']== "bot"]
+def scrape(users):
     auth = OAuth1UserHandler(
         consumer_key=keys.CONSUMER_KEY,
         consumer_secret=keys.CONSUMER_SECRET,
@@ -22,5 +27,8 @@ def main():
     client = xauth.get_client()
     scraper = Scraper(client)
     scraper.get_users(uids = users)
+def main():
+    users = bot_user_ids().tolist()[:100]
+    scrape(users=users)
 if __name__ == "__main__":
     main()
