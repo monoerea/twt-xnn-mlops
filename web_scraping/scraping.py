@@ -9,40 +9,17 @@ class Scraper():
     def __init__(self, client):
         self.client: API | Client = client
     def get_users(self, uids: list, **kwargs) -> pd.DataFrame:
-        user = self.client.get_users(ids=uids, **kwargs)
-        users = []
-        for obj in user.data:
-            users.append(vars(obj))
-        return users
+        users = self.client.get_users(ids=uids, **kwargs)
+        return [user.data for user in users.data]
 
     def get_user(self, uids: int | str | None, username: str | None = None, **kwargs) -> dict:
-        try:
-            user = self.client.get_user(id = uids,username=username, **kwargs).data.data
-            if isinstance(user.data, dict):
-                return user.data
-            raise RuntimeError("Unexpected user data format")
-        except tweepy.TweepyException as e:
-            print(e)
+        return self.client.get_user(id = uids,username=username, **kwargs).data.data
     def lookup_users(self, uids: list[int]= None, usernames : list[str] = None, **kwargs)-> pd.DataFrame:
-        """Return up to 100 fully hydrated user objects in dataframe
-
-        Args:
-            uids (list[int]): List of up to 100 X ids
-            usernames (list[str]): List of up to 100 X usernames
-
-        Returns:
-            pd.DataFrame: For saving to csv file or data analysis
-        """
-        if isinstance(self.client, API):
-            raise TypeError("self.client must be an instance of Client")
         users = self.client.lookup_users(user_id=uids, screen_name=usernames, **kwargs)
-        user_list = []
-        for obj in users.data:
-            user_list.append(vars(obj))
-        return user_list
+        return [vars(user.data) for user in users.data]
+    
 def bot_user_ids():
     users = pd.read_csv("data/raw/label.csv")
-    users.head(10)
     users["id"] = users["id"].str.removeprefix("u").astype(int)
     return users["id"][users['label']== "bot"]
 
@@ -52,8 +29,7 @@ def create_client():
         consumer_secret=keys.CONSUMER_SECRET,
         access_token= keys.ACCESS_TOKEN,
         access_token_secret=keys.ACCESS_TOKEN_SECRET)
-    xauth = TwitterAuthenticator(auth=auth)
-    return xauth.get_client()
+    return TwitterAuthenticator(auth=auth).get_client()
 
 def scrape(client, users: list = None,  choice: int = None, fields: dict = None):
     if not users:
@@ -85,20 +61,20 @@ def process_chunks(client, chunks, choice, fields):
     data = []
     pbar = tqdm(chunks, desc="Scraping chunks")
     for chunk in pbar:
-        for attempt in range(2):
+        attempt = 0
+        while attempt < 2:
             try:
-                result = scrape(users=chunk, client=client, choice=choice, fields=fields)
-                data.extend(result)
-                pbar.set_postfix({"success": len(data)})
-                break
+                data.extend(scrape(users=chunk, client=client, choice=choice, fields=fields))
+                pbar.update(1)
+                break  # Exit retry loop on success
             except tweepy.TooManyRequests as e:
-                print(e)
                 if attempt == 0:
-                    time.sleep(1)
+                    time.sleep(1)  # Retry after delay
                 else:
-                    pbar.write(f"Failed chunk: {chunk}")
-                    continue
+                    pbar.write(f"Failed chunk: {chunk} | Error: {e}")
+            attempt += 1
     return data
+
 def make_request():
     user_fields = [
     "id",                        # Unique identifier (default)
@@ -160,18 +136,13 @@ def make_request():
         }
     client = create_client()
     users = bot_user_ids().sample(n=10000,random_state=21).to_list()
-    while True:
-        choice = input("Please input an option: \n1. Single User \n2. Multiple \nInput: ")
-        if choice in ("1", "2"):
-            choice = int(choice)
-            break
-        print("Invalid choice. Please enter 1 or 2.")
-    chunks = [users] if choice == 1 else chunker(users, 10)
+
+    choice = input("Choose: \n1. Single User \n2. Multiple \nInput: ")
+    choice = int(choice) if choice in {"1", "2"} else 2
+
+    chunks = chunker(users, 1)[0] if choice == 1 else chunker(users, 10)
     data = process_chunks(client=client, chunks=chunks, choice=choice, fields=fields)
     to_csv("x-data_10k", data=data)
 
-def main():
-    make_request()
-
 if __name__ == "__main__":
-    main()
+    make_request()
