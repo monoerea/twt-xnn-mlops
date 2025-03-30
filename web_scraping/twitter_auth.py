@@ -25,7 +25,8 @@ class TwitterAuthenticator():
             consumer_key=keys.CONSUMER_KEY,
             consumer_secret=keys.CONSUMER_SECRET,
             access_token=self.auth.access_token,
-            access_token_secret=self.auth.access_token_secret)
+            access_token_secret=self.auth.access_token_secret,
+            wait_on_rate_limit=True)
             return self.client
         except TweepyException  as e:
             print(f"Error creating Client: {e}")
@@ -58,7 +59,8 @@ class TwitterAuthenticator():
         if not self.auth:
             self.auth = OAuth1UserHandler(
                 consumer_key=keys.CONSUMER_KEY,
-                consumer_secret=keys.CONSUMER_SECRET
+                consumer_secret=keys.CONSUMER_SECRET,
+                wait_on_rate_limit=True
             )
         if pin:
             try:
