@@ -1,3 +1,5 @@
+import time
+from tqdm import tqdm
 import tweepy
 from twitter_auth import TwitterAuthenticator
 import pandas as pd
@@ -8,22 +10,19 @@ class Scraper():
         self.client: API | Client = client
     def get_users(self, uids: list, **kwargs) -> pd.DataFrame:
         user = self.client.get_users(ids=uids, **kwargs)
-        print(user)
-        for i in user:
-            try:
-                print(i._json)
-            except Exception as e:
-                print(e)
         users = []
         for obj in user.data:
             users.append(vars(obj))
-        print("Same size:", len(users)==len(users.data))
-        return pd.DataFrame(users)
+        return users
 
-    def get_user(self, uid: int = None, username: str = None, **kwargs) ->dict:
-        user = self.client.get_user(uid = uid, username=username,  **kwargs)
-        return vars(user.data)
-
+    def get_user(self, uids: int | str | None, username: str | None = None, **kwargs) -> dict:
+        try:
+            user = self.client.get_user(id = uids,username=username, **kwargs).data.data
+            if isinstance(user.data, dict):
+                return user.data
+            raise RuntimeError("Unexpected user data format")
+        except tweepy.TweepyException as e:
+            print(e)
     def lookup_users(self, uids: list[int]= None, usernames : list[str] = None, **kwargs)-> pd.DataFrame:
         """Return up to 100 fully hydrated user objects in dataframe
 
@@ -40,20 +39,67 @@ class Scraper():
         user_list = []
         for obj in users.data:
             user_list.append(vars(obj))
-        df = pd.DataFrame(user_list)
-        return df
+        return user_list
 def bot_user_ids():
     users = pd.read_csv("data/raw/label.csv")
     users.head(10)
     users["id"] = users["id"].str.removeprefix("u").astype(int)
     return users["id"][users['label']== "bot"]
-def scrape(users: list = None):
+
+def create_client():
     auth = OAuth1UserHandler(
         consumer_key=keys.CONSUMER_KEY,
         consumer_secret=keys.CONSUMER_SECRET,
-        access_token='1569207846893670400-BZKMpsnmkaqCWUYtVgGjeU6IPQa1qY',access_token_secret='JMOnXtVkAAn2xRuHyKuK3HFdaKoUZcr25IK0HJg2LrHMn')
+        access_token= keys.ACCESS_TOKEN,
+        access_token_secret=keys.ACCESS_TOKEN_SECRET)
     xauth = TwitterAuthenticator(auth=auth)
-    client = xauth.get_client()
+    return xauth.get_client()
+
+def scrape(client, users: list = None,  choice: int = None, fields: dict = None):
+    if not users:
+        print("No users.")
+        return
+    scraper = Scraper(client)
+    scrape_method = scraper.get_user
+    if choice == 2:
+        if isinstance(client, Client):
+            scrape_method = scraper.get_users
+        if isinstance(client, API):
+            scrape_method = scraper.lookup_users
+    return scrape_method(uids=users, user_fields = fields["user"], tweet_fields=fields["tweet"])
+
+def chunker(data:list, num_lenght:int)-> list:
+    chunks = []
+    for i in range(0,len(data),num_lenght):
+        chunks.append(data[i:i+num_lenght])
+    return chunks
+
+def to_csv( filename: str, data: list[dict]| pd.DataFrame = None):
+    if isinstance(data, list[dict]):
+        data = pd.DataFrame(data)
+    if 'new_col' in data.columns1:
+        data.insert(0, 'new_col', data.pop('new_col'))
+    data.to_csv(f"data/raw/{filename}.csv", index=False)
+
+def process_chunks(client, chunks, choice, fields):
+    data = []
+    pbar = tqdm(chunks, desc="Scraping chunks")
+    for chunk in pbar:
+        for attempt in range(2):
+            try:
+                result = scrape(users=chunk, client=client, choice=choice, fields=fields)
+                data.extend(result)
+                pbar.set_postfix({"success": len(data)})
+                break
+            except tweepy.TooManyRequests as e:
+                print(e)
+                if attempt == 0:
+                    time.sleep(1)
+                else:
+                    pbar.write(f"Failed chunk: {chunk}")
+                    continue
+    return data
+def make_request():
     user_fields = [
     "id",                        # Unique identifier (default)
     "name",                      # Profile name (default)
@@ -108,24 +154,24 @@ def scrape(users: list = None):
     "organic_metrics",      # object - Organic engagement metrics
     "promoted_metrics"      # object - Promoted engagement metrics
     ]
-    if isinstance(client, Client):
-        scraper = Scraper(client)
-        #scraper.get_users(uids = users)
-        user = scraper.get_users(uids=users, user_fields = user_fields,)
-        df = pd.DataFrame(user)
-        #df: pd.DataFrame = scraper.get_user(uids=users)
-        df.to_csv("data/raw/user_100.csv")
-import random
-import time
+    fields = {
+        "user": user_fields,
+        "tweet": tweet_fields
+        }
+    client = create_client()
+    users = bot_user_ids().sample(n=10000,random_state=21).to_list()
+    while True:
+        choice = input("Please input an option: \n1. Single User \n2. Multiple \nInput: ")
+        if choice in ("1", "2"):
+            choice = int(choice)
+            break
+        print("Invalid choice. Please enter 1 or 2.")
+    chunks = [users] if choice == 1 else chunker(users, 10)
+    data = process_chunks(client=client, chunks=chunks, choice=choice, fields=fields)
+    to_csv("x-data_10k", data=data)
 
-def make_request():
-    try:
-        users = bot_user_ids().tolist()[:100]
-        scrape(users=users)
-    except tweepy.TooManyRequests as e:
-        print(e)
-        return make_request()
 def main():
     make_request()
+
 if __name__ == "__main__":
     main()
