@@ -25,7 +25,7 @@ user_fields = [
     "verified_type",             # Type of verification (e.g., "government", "business")
     "withheld"                   # Content withholding details (legal/tos reasons)
     ]
-    tweet_fields = [
+tweet_fields = [
     # Default fields (always included)
     "id",                   # string - Unique identifier of the Tweet
     "text",                 # string - UTF-8 text content of the Tweet
@@ -52,7 +52,7 @@ user_fields = [
     "organic_metrics",      # object - Organic engagement metrics
     "promoted_metrics"      # object - Promoted engagement metrics
     ]
-    fields = {
+fields = {
         "user": user_fields,
         "tweet": tweet_fields
         }

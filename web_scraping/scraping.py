@@ -8,16 +8,19 @@ import keys
 class Scraper():
     def __init__(self, client):
         self.client: API | Client = client
-    def get_users(self, uids: list, **kwargs) -> pd.DataFrame:
-        users = self.client.get_users(ids=uids, **kwargs)
-        return [user.data for user in users.data]
+    def get_users(self, uids: int | str | None, usernames: str | None = None, **kwargs) -> list[dict]:
+        users = self.client.get_users(ids=uids, usernames=usernames, **kwargs)
+        user_list = [user.data for user in users.data]
+        return user_list
 
-    def get_user(self, uids: int | str | None, username: str | None = None, **kwargs) -> dict:
-        return self.client.get_user(id = uids,username=username, **kwargs).data.data
-    def lookup_users(self, uids: list[int]= None, usernames : list[str] = None, **kwargs)-> pd.DataFrame:
+    def get_user(self, uids: int | str | None, usernames: str | None = None, **kwargs) -> dict:
+        users = self.client.get_user(id = uids,username=usernames, **kwargs).data.data
+        return users
+    def lookup_users(self, uids: list[int]= None, usernames : list[str] = None, **kwargs)-> list[dict]:
         users = self.client.lookup_users(user_id=uids, screen_name=usernames, **kwargs)
-        return [vars(user.data) for user in users.data]
-    
+        user_list = [user.data for user in users.data]
+        return user_list
+
 def bot_user_ids():
     users = pd.read_csv("data/raw/label.csv")
     users["id"] = users["id"].str.removeprefix("u").astype(int)
@@ -40,7 +43,7 @@ def scrape(client, users: list = None,  choice: int = None, fields: dict = None)
     if choice == 2:
         if isinstance(client, Client):
             scrape_method = scraper.get_users
-        if isinstance(client, API):
+        elif isinstance(client, API):
             scrape_method = scraper.lookup_users
     return scrape_method(uids=users, user_fields = fields["user"], tweet_fields=fields["tweet"])
 
@@ -57,21 +60,23 @@ def to_csv( filename: str, data: list[dict]| pd.DataFrame = None):
         data.insert(0, 'new_col', data.pop('new_col'))
     data.to_csv(f"data/raw/{filename}.csv", index=False)
 
-def process_chunks(client, chunks, choice, fields):
+def process_chunks(client, chunks, choice, fields, filename):
     data = []
     pbar = tqdm(chunks, desc="Scraping chunks")
-    for chunk in pbar:
+    for i, chunk in enumerate(chunks):
         attempt = 0
         while attempt < 2:
             try:
-                data.extend(scrape(users=chunk, client=client, choice=choice, fields=fields))
+                result= scrape(users=chunk, client=client, choice=choice, fields=fields)
+                data.extend(result)
+                df = pd.DataFrame(data)
+                df.to_csv(f"data/raw/{filename}.csv", mode='a', header=not file_exists, index=False)
+                file_exists = True
                 pbar.update(1)
                 break  # Exit retry loop on success
             except tweepy.TooManyRequests as e:
-                if attempt == 0:
-                    time.sleep(1)  # Retry after delay
-                else:
-                    pbar.write(f"Failed chunk: {chunk} | Error: {e}")
+                time.sleep(15*60)
+                pbar.write(f"Failed chunk #{i}: {chunk} | Error: {e}")
             attempt += 1
     return data
 
@@ -134,6 +139,7 @@ def make_request():
         "user": user_fields,
         "tweet": tweet_fields
         }
+    filename = 'users_10k'
     client = create_client()
     users = bot_user_ids().sample(n=10000,random_state=21).to_list()
 
@@ -141,8 +147,8 @@ def make_request():
     choice = int(choice) if choice in {"1", "2"} else 2
 
     chunks = chunker(users, 1)[0] if choice == 1 else chunker(users, 10)
-    data = process_chunks(client=client, chunks=chunks, choice=choice, fields=fields)
-    to_csv("x-data_10k", data=data)
+    data = process_chunks(client=client, chunks=chunks, choice=choice, fields=fields, filename=filename)
+    to_csv(filename, data)
 
 if __name__ == "__main__":
     make_request()
