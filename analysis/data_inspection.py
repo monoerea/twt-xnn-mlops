@@ -185,6 +185,7 @@ class DataInspector:
         self.missing_value_analysis()
         print("\n✅ All reports generated: CSV summary and plot images saved.")
 
+
 if __name__ == "__main__":
     # Example Usage:
     df = pd.read_csv("data/processed/flattened_status.csv", low_memory=False)  # Load your dataframe
