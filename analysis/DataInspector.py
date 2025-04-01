@@ -171,7 +171,7 @@ class DataInspector:
             try:
                 result = self.execute(strategy_name, **strategy_kwargs)
                 results[strategy_name] = result
-                summary_path = f"{output_dir}/result/{strategy_name}_result.csv"
+                summary_path = f"{output_dir}/{strategy_name}_result.csv"
                 if isinstance(result, dict):
                     result = pd.DataFrame([result])
                     result.to_csv(summary_path)
@@ -184,12 +184,13 @@ class DataInspector:
             except Exception as e:
                 print(f"⚠️ Error in {strategy_name}: {str.__name__} - {str(e)}")
 
-        summary_path = f"{output_dir}/data_summary.csv"
-        pd.DataFrame({
+        data_summary = pd.DataFrame({
             'Column': self.df.columns,
             'Missing %': (self.df.isnull().mean() * 100).round(2),
             'Data Type': self.df.dtypes
-        }).to_csv(summary_path, index=False)
+        })
+        data_summary.to_csv(f"{output_dir}/data_summary.csv", index=False)
+        print("\n === Data Summary ==",data_summary)
         print(f"\n✅ Report generated in {output_dir}")
         return results
 
@@ -207,7 +208,7 @@ if __name__ == "__main__":
     )
 
     print("=== DEFAULT REPORT ===")
-    output_dir = 'analysis'
+    output_dir = 'analysis/result'
     strategies = [
             ('basic_info', {}),
             ('mcar', {'columns': None, 'pct': 0.05}),
