@@ -134,7 +134,7 @@ class DataInspector:
         'mcar': ThresholdMCARStrategy(),
         'ttest': TTestStrategy(),
         'missing_heatmap': MissingValueHeatmapStrategy(),
-        'outlier_strategy': OutlierAnalysisStrategy()
+        'outlier': OutlierAnalysisStrategy()
         }
 
     def __init__(self, df: pd.DataFrame, thresholds=(0.05, 0.95), exclude_columns=None):
@@ -212,6 +212,7 @@ if __name__ == "__main__":
             ('basic_info', {}),
             ('mcar', {'columns': None, 'pct': 0.05}),
             ('ttest', {'target_cols': None, 'group_col': None}),
+            ('outlier',{'threshold':5}),
             ('missing_heatmap', {'filename': f"{output_dir}/missing_heatmap.png"})
         ]
     inspector.generate_report(output_dir=output_dir, strategies=strategies)
