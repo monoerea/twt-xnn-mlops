@@ -22,7 +22,7 @@ class Scraper():
         return user_list
 
 def bot_user_ids():
-    users = pd.read_csv("data/raw/label.csv")
+    users = pd.read_csv("data/raw/bots/label.csv")
     users["id"] = users["id"].str.removeprefix("u").astype(int)
     return users["id"][users['label']== "bot"]
 

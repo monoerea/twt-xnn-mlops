@@ -5,3 +5,4 @@ tweepy
 pandas
 matplotlib
 seaborn
+tabulate

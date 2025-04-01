@@ -1,44 +1,42 @@
 import ast
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def load_data(file_path:str = "data/raw/status_25k.csv") -> pd.DataFrame:
-    """Loads data from a csv file and return a pandas Dataframe.
-    """
+def load_data(file_path:str = "data/raw/bots/status_25k.csv") -> pd.DataFrame:
     df = pd.read_csv(file_path, low_memory=False)
     return df
 
 def data_inspection(df:pd.DataFrame) -> None:
-    """Prints the first 5 rows of the dataframe, the shape of the dataframe and the columns of the dataframe.
-    """
-    print("First 5 rows of the dataframe:")
-    print(df.head())
+    summary = {
+        "Shape": df.shape,
+        "Columns of the DataFrame": df.columns,
+        "Data Types": df.dtypes,
+        
+        }
     print(f"Shape of the dataframe: {df.shape}")
     print(f"Columns of the dataframe: {df.columns}")
     print(f"Data types of the columns: {df.dtypes}")
     print(f"Missing values in the dataframe: {df.isnull().sum()}")
     print(f"Data types of the columns: {df.dtypes}")
-    print(f"Number of unique values in each column: {df.nunique()}")
-    print(f"Number of duplicate rows: {df.duplicated().sum()}")
-    print(f"Number of missing values in each column: {df.isnull().sum()}")
+    cols_with_lists = [col for col in df.columns if df[col].apply(lambda x: isinstance(x, list)).any()]
+    # Apply nunique only to columns that do not contain lists
+    hashable_cols = [col for col in df.columns if col not in cols_with_lists]
+    print(f"Number of unique values in each column: {df[hashable_cols].nunique()}")
+    print(f"Number of duplicate rows: {df[hashable_cols].duplicated().sum()}")
+    print(f"Number of missing values in each column: {df.isnull().mean().sort_values()}")
     print(df.describe())
     print(df.info())
 
 def plot_null(df: pd.DataFrame) -> None:
-    """Plots the null values in the dataframe.
-    """
     plt.figure(figsize=(10, 8))
-    sns.heatmap(df.isnull(), cbar=False, cmap='viridis')
+    sns.heatmap(df.isnull(), cbar=False)
     plt.title('Missing Values Heatmap')
     plt.show()
     print(f"Missing values in the dataframe: {df.isnull().sum()}")
 
-import pandas as pd
-import ast
-
 def flatten_column(df: pd.DataFrame, col_name: str) -> pd.DataFrame:
-    """Flattens a column with nested lists or dictionaries and numbers list items if needed."""
     if col_name not in df.columns:
         return df  # Skip if column doesn't exist
 
@@ -73,10 +71,24 @@ def flatten_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-
+def t_test(df: pd.DataFrame, column_to_test: str)-> int:
+    df_test = df.copy()
+    df_test[column_to_test]
+    df_test.loc[np.random(len(df_test)<0.05, seed = 21): column_to_test] = np.nan
+    print(df_test[column_to_test].is_null().sum())
 if __name__ == "__main__":
     df = load_data()
-    #data_inspection(df)
-    #plot_null(df)
-    flattened = flatten_dataframe(df)
-    flattened.to_csv("data/processed/flattened.csv", index=False)
+    df =df[df.columns.difference(['user','entities'])]
+    df = flatten_dataframe(df)
+    cols_in_list = [col for col in df.columns if df[col].apply(lambda x: isinstance(x, list) and bool(x)).any()]
+    print(cols_in_list)
+    #df =df[df.columns.difference(cols_in_list)]
+    df.to_csv("data/processed/flattened_status.csv", index=False)
+
+    #Make the null values a category of NaN
+    data_inspection(df)
+    # plot_null(df)
+    # col_to_test = df[df.isnull().mean()>.5].columns
+    # for i in col_to_test:
+    #     t_test(df, i)
+    # 
