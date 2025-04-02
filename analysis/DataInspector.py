@@ -3,8 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from abc import ABC, abstractmethod
-from scipy.stats import ttest_ind
-from tabulate import tabulate
+from scipy.stats import ttest_ind, levene, shapiro
 from typing import Dict, List, Optional, Union, Type
 
 class AnalysisStrategy(ABC):
@@ -43,24 +42,23 @@ class ThresholdMCARStrategy(AnalysisStrategy):
             original = inspector.df[col].copy()
             simulated = self._simulate_missing(original, pct, random_state)
             results[col] = self._create_comparison(original, simulated)
-            print(results)
+        results = self.format_mcar_results(results)
         return results
 
     def _get_auto_columns(self, inspector):
         missing_pct = inspector.df.isnull().mean()
-        return [
+        excl =  [
             col for col in inspector.df.columns
             if missing_pct[col] > inspector.thresholds[0] and missing_pct[col] < inspector.thresholds[1]
-            and not any(excl.lower() in col.lower() for excl in inspector.exclude_columns)
+            and not any(exclude_str in col.lower() for exclude_str in inspector.exclude_columns)
             and pd.api.types.is_numeric_dtype(inspector.df[col])
         ]
+        return excl
 
-
-    def _simulate_missing(self, series, pct, random_state):
-        if random_state:
-            np.random.seed(random_state)
-        mask = np.random.rand(len(series)) < pct
-        return series.mask(mask)
+    def _simulate_missing(self, series, pct, random_state=None):
+        return series.mask(
+        np.random.default_rng(random_state).random(len(series)) < pct
+        )
 
     def _create_comparison(self, original, simulated):
         comparison = pd.concat([
@@ -70,42 +68,147 @@ class ThresholdMCARStrategy(AnalysisStrategy):
         comparison['Diff'] = comparison['MCAR'] - comparison['Original']
         comparison['Pct_Change'] = (comparison['Diff'] / comparison['Original']).abs() * 100
         return comparison.round(2)
+    def format_mcar_results(self, comparison: dict)-> pd.DataFrame:
+        combined = pd.concat(comparison.values(), 
+                            keys=comparison.keys(),
+                            names=['Feature', 'Metric'])
+        combined = combined.reset_index(level='Metric')
+        combined = combined.reset_index(drop=False)
+        return combined
+
+import numpy as np
+import pandas as pd
+from scipy.stats import ttest_ind, levene, shapiro
 
 class TTestStrategy(AnalysisStrategy):
-    def execute(self, inspector, target_cols=None, **kwargs):
-        target_cols = target_cols or inspector.df.select_dtypes(include='number').columns
+    def execute(self, inspector, target_cols=None, sample_frac=0.0, random_state=21, **kwargs):
+        """Execute MCAR test with comprehensive statistics"""
+        df = inspector.df
+        df_copy = df.copy()
+
+        # Auto-select target columns if not specified
+        if target_cols is None:
+            numeric_cols = df.select_dtypes(include='number').columns
+            missing_pct = df[numeric_cols].isnull().mean()
+
+            target_cols = [
+                col for col in numeric_cols
+                if (inspector.thresholds[0] < missing_pct[col] < inspector.thresholds[1] and
+                    not any(ex in col.lower() for ex in (inspector.exclude_columns or [])))
+            ]
+
         results = []
-        df_copy = inspector.df.copy()
         for col in target_cols:
-            if col in inspector.df.columns:
-                mask = inspector.df[col].sample(frac=0.05, random_state=21).index
-                df_copy.loc[mask, col] = np.nan
-                group_col = df_copy[col].isna().astype(int)
-                result = self._perform_ttest(inspector.df, col, group_col)
-                if result:
-                    results.append(result)
+            if col not in df.columns:
+                continue
 
-        return pd.DataFrame(results)
+            # Create synthetic missing values
+            mask = df[col].sample(frac=sample_frac, random_state=random_state).index
+            df_copy.loc[mask, col] = np.nan
+            missing_mask = df_copy[col].isna()
+            
+            # Calculate statistics
+            result = self._calculate_stats(df, col, missing_mask)
+            if result:
+                results.append(result)
+        
+        return pd.DataFrame(results) if results else pd.DataFrame()
 
-    def _perform_ttest(self, df, target_col, group_col):
-        present = df[group_col == 0][target_col]
-        missing = df[group_col == 1][target_col]
+    def _calculate_stats(self, df, target_col, missing_mask):
+        """Calculate comprehensive statistics with robust error handling"""
+        present = df.loc[~missing_mask, target_col].dropna()
+        missing = df.loc[missing_mask, target_col].dropna()
+        # Base result with guaranteed fields
+        result = {
+            'Target': target_col,
+            'Missing %': missing_mask.mean(),
+            'N Present': len(present),
+            'N Missing': len(missing)
+        }
+        # Central tendency
+        result.update(self._calculate_central_tendency(present, missing))
 
-        if len(present) > 1 and len(missing) > 1:
-            t_stat, p_val = ttest_ind(present, missing, equal_var=False)
-            return {
-                'Target': target_col,
-                't-stat': t_stat,
-                'p-value': p_val,
-                'Present Mean': present.mean(),
-                'Missing Mean': missing.mean()
-            }
-        return None
+        # Dispersion
+        result.update(self._calculate_dispersion(present, missing))
+
+        # Normality tests
+        result.update(self._calculate_normality_tests(present, missing))
+
+        # Variance and effect size
+        result.update(self._calculate_variance_effect(present, missing))
+
+        # T-test
+        result.update(self._calculate_ttest(present, missing))
+
+        return result
+
+    def _calculate_central_tendency(self, present, missing):
+        """Calculate mean and median metrics"""
+        stats = {}
+        stats['Present Mean'] = present.mean() if len(present) > 0 else np.nan
+        stats['Missing Mean'] = missing.mean() if len(missing) > 0 else np.nan
+        stats['Present Median'] = present.median() if len(present) > 0 else np.nan
+        stats['Missing Median'] = missing.median() if len(missing) > 0 else np.nan
+        return stats
+
+    def _calculate_dispersion(self, present, missing):
+        """Calculate standard deviation and IQR"""
+        stats = {}
+        if len(present) >= 2:
+            stats['Present Std'] = present.std()
+            stats['Present IQR'] = present.quantile(0.75) - present.quantile(0.25)
+        if len(missing) >= 2:
+            stats['Missing Std'] = missing.std()
+            stats['Missing IQR'] = missing.quantile(0.75) - missing.quantile(0.25)
+        return stats
+
+    def _calculate_normality_tests(self, present, missing):
+        """Calculate Shapiro-Wilk normality tests"""
+        stats = {}
+        if 3 <= len(present) <= 5000:
+            stats['Shapiro-Wilk (Present)'] = shapiro(present)[1]
+        if 3 <= len(missing) <= 5000:
+            stats['Shapiro-Wilk (Missing)'] = shapiro(missing)[1]
+        return stats
+
+    def _calculate_variance_effect(self, present, missing):
+        """Calculate Levene's test and Cohen's d"""
+        stats = {}
+        if len(present) >= 2 and len(missing) >= 2:
+            stats['Levene p-value'] = levene(present, missing)[1]
+
+            # Properly parenthesized Cohen's d calculation
+            numerator = (len(present)-1)*present.std()**2 + (len(missing)-1)*missing.std()**2
+            denominator = len(present) + len(missing) - 2
+            pooled_var = numerator / denominator
+            pooled_std = np.sqrt(pooled_var)
+
+            if pooled_std != 0:
+                stats["Cohen's d"] = (present.mean() - missing.mean()) / pooled_std
+        return stats
+
+    def _calculate_ttest(self, present, missing):
+        """Perform Welch's t-test"""
+        stats = {}
+        if len(present) >= 2 and len(missing) >= 2:
+            try:
+                t_stat, p_val = ttest_ind(present, missing, equal_var=False)
+                stats.update({'t-stat': t_stat, 'p-value': p_val})
+            except:
+                pass
+        return stats
 
 
 class OutlierAnalysisStrategy(AnalysisStrategy):
         def execute(self, inspector, columns=None, threshold=3, **kwargs):
-            cols = columns or inspector.df.select_dtypes(include='number').columns
+            if columns is None:
+                numeric_cols = df.select_dtypes(include='number').columns
+                missing_pct = df[numeric_cols].isnull().mean()
+                cols = columns or [
+                    col for col in numeric_cols
+                    if (inspector.thresholds[0] < missing_pct[col] < inspector.thresholds[1] and
+                        not any(ex in col.lower() for ex in (inspector.exclude_columns or [])))
+                ]
             results = {}
             for col in cols:
                 if col in inspector.df.columns:
@@ -140,7 +243,12 @@ class DataInspector:
     def __init__(self, df: pd.DataFrame, thresholds=(0.05, 0.95), exclude_columns=None):
         self.df = df
         self.thresholds = thresholds
-        self.exclude_columns = exclude_columns or []
+        self.exclude_columns = exclude_columns or [
+            col for col in inspector.df.select_dtypes(include='number')
+            if inspector.thresholds[0] < inspector.df[col].isnull().mean() < inspector.thresholds[1]
+            and not any(ex in col.lower() for ex in inspector.exclude_columns)
+        ]
+
         self._strategies = self._default_strategies.copy()
     def register_strategy(self, name: str, strategy: Union[AnalysisStrategy, VisualizationStrategy],
                         overwrite=False):
@@ -154,7 +262,7 @@ class DataInspector:
         if not strategy:
             raise ValueError(f"Unknown strategy: {strategy_name}. Available: {list(self._strategies.keys())}")
         return strategy.execute(self, **kwargs)
-    def generate_report(self, output_dir="analysis", strategies=None, **kwargs):
+    def generate_report(self, output_dir="analysis", strategies=None):
         """Generate a customizable report"""
         import os
         os.makedirs(output_dir, exist_ok=True)
@@ -164,7 +272,6 @@ class DataInspector:
             ('ttest', {'columns': None, 'pct': 0.05}),
             ('missing_heatmap', {'filename': f"{output_dir}/missing_heatmap.png"})
         ]
-
         results = {}
         for strategy_name, strategy_kwargs in strategies:
             print(f"\n=== {strategy_name.upper()} ===")
@@ -198,9 +305,12 @@ class DataInspector:
 if __name__ == "__main__":
     # Sample data
     data =pd.read_csv("data/processed/flattened_status.csv", low_memory=False)
-    df = pd.DataFrame(data).sample(frac=0.95)  # Introduce missing values
+    df = pd.DataFrame(data).drop_duplicates()
+    value = True
+    if value == True:
+        to_remove = df.columns[df.isna().mean() > 0.95]
+        df = df.drop(columns=to_remove)
 
-    # Initialize inspector
     inspector = DataInspector(
         df=df,
         thresholds=[0.5, 0.95],
@@ -212,7 +322,7 @@ if __name__ == "__main__":
     strategies = [
             ('basic_info', {}),
             ('mcar', {'columns': None, 'pct': 0.05}),
-            ('ttest', {'target_cols': None, 'group_col': None}),
+            ('ttest', {'target_cols': None, 'group_col': None, }),
             ('outlier',{'threshold':5}),
             ('missing_heatmap', {'filename': f"{output_dir}/missing_heatmap.png"})
         ]

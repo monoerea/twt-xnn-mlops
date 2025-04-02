@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from tabulate import tabulate
 from scipy.stats import ttest_ind
 
 class DataInspector:
@@ -33,7 +32,7 @@ class DataInspector:
 
         # Print basic info to the console
         print("\nBasic Information:")
-        print(tabulate(basic_info_df, headers='keys', tablefmt='pretty', showindex=False))
+        print(basic_info_df)
         print(info)
 
         return basic_info_df
@@ -84,7 +83,7 @@ class DataInspector:
         return self.df.columns[
             (missing_pct > min_missing) &
             (missing_pct < max_missing) &
-            ~self.df.columns.str.contains(",".join(self.exclude_columns), case=False) &
+            self.df.columns.str.contains(",".join(self.exclude_columns), case=False) &
             (self.df.dtypes != 'object')
         ].tolist()
 
@@ -180,7 +179,7 @@ class DataInspector:
         """Generates CSV summary and saves images for plots."""
         self.basic_info()
         self.save_csv_summary(filename)
-        #self.plot_missing_values("missing_values_heatmap.png")
+        self.plot_missing_values("missing_values_heatmap.png")
         #self.plot_distribution("numeric_distribution.png")
         self.missing_value_analysis()
         print("\n✅ All reports generated: CSV summary and plot images saved.")

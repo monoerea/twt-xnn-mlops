@@ -1,2 +1,2 @@
 ,Shape,Columns,Missing Values,Duplicates,Data Types
-0,"(23983, 301)",301,6249154,1095,"dict_values([np.int64(213), np.int64(81), np.int64(4), np.int64(3)])"
+0,"(24028, 138)",138,2391787,10,"dict_values([np.int64(101), np.int64(30), np.int64(4), np.int64(3)])"

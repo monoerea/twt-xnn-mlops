@@ -1,114 +1,113 @@
-,quoted_status.retweet_count,quoted_status.favorite_count,quoted_status.user.followers_count,quoted_status.user.friends_count,quoted_status.user.listed_count,quoted_status.user.favourites_count,quoted_status.user.statuses_count,retweeted_status.retweet_count,retweeted_status.favorite_count,retweeted_status.user.followers_count,retweeted_status.user.friends_count,retweeted_status.user.listed_count,retweeted_status.user.favourites_count,retweeted_status.user.statuses_count
-0,"        Original       MCAR    Diff  Pct_Change
-count    1428.00    1355.00  -73.00        5.11
-mean     1368.58    1419.43   50.85        3.72
-std      7295.93    7480.89  184.96        2.54
-min         0.00       0.00    0.00         NaN
-25%         3.00       3.00    0.00        0.00
-50%        17.00      18.00    1.00        5.88
-75%       186.25     202.50   16.25        8.72
-max    181096.00  181096.00    0.00        0.00","        Original       MCAR    Diff  Pct_Change
-count    1428.00    1351.00  -77.00        5.39
-mean     6506.23    6466.39  -39.83        0.61
-std     31375.12   31485.00  109.88        0.35
-min         0.00       0.00    0.00         NaN
-25%        13.00      13.00    0.00        0.00
-50%        73.00      72.00   -1.00        1.37
-75%       988.25     992.00    3.75        0.38
-max    532853.00  532853.00    0.00        0.00","           Original          MCAR      Diff  Pct_Change
-count  1.428000e+03  1.348000e+03    -80.00        5.60
-mean   1.324751e+06  1.297857e+06 -26894.28        2.03
-std    8.369142e+06  8.378998e+06   9855.94        0.12
-min    1.000000e+00  4.000000e+00      3.00      300.00
-25%    1.993750e+03  1.970750e+03    -23.00        1.15
-50%    1.640650e+04  1.678300e+04    376.50        2.29
-75%    1.344408e+05  1.344415e+05      0.75        0.00
-max    1.344447e+08  1.344447e+08      0.00        0.00","        Original       MCAR    Diff  Pct_Change
-count    1428.00    1358.00  -70.00        4.90
-mean     4073.61    4142.59   68.98        1.69
-std     36575.72   37489.72  913.99        2.50
-min         0.00       0.00    0.00         NaN
-25%       255.25     258.25    3.00        1.18
-50%       720.50     708.00  -12.50        1.73
-75%      1756.00    1754.50   -1.50        0.09
-max    793068.00  793068.00    0.00        0.00","        Original       MCAR    Diff  Pct_Change
-count    1428.00    1338.00  -90.00        6.30
-mean     3530.27    3567.83   37.56        1.06
-std     17399.60   17800.88  401.28        2.31
-min         0.00       0.00    0.00         NaN
-25%        20.00      20.00    0.00        0.00
-50%       164.00     160.00   -4.00        2.44
-75%       974.00     963.00  -11.00        1.13
-max    217952.00  217952.00    0.00        0.00","        Original       MCAR     Diff  Pct_Change
-count    1428.00    1342.00   -86.00        6.02
-mean    22279.46   22705.39   425.92        1.91
-std     56039.26   57441.64  1402.38        2.50
-min         0.00       0.00     0.00         NaN
-25%       874.00     857.25   -16.75        1.92
-50%      4486.00    4442.00   -44.00        0.98
-75%     17813.50   17787.25   -26.25        0.15
-max    952336.00  952336.00     0.00        0.00","         Original        MCAR     Diff  Pct_Change
-count     1428.00     1359.00   -69.00        4.83
-mean     46194.94    46399.47   204.52        0.44
-std     181301.66   182875.01  1573.35        0.87
-min          2.00        2.00     0.00        0.00
-25%       2073.00     2055.00   -18.00        0.87
-50%       9083.50     9117.00    33.50        0.37
-75%      34015.00    34015.00     0.00        0.00
-max    3885920.00  3885920.00     0.00        0.00","         Original        MCAR    Diff  Pct_Change
-count     7902.00     7523.00 -379.00        4.80
-mean      2204.43     2213.58    9.14        0.41
-std      35296.55    36048.55  752.00        2.13
-min          0.00        0.00    0.00         NaN
-25%          4.00        4.00    0.00        0.00
-50%         21.00       21.00    0.00        0.00
-75%        238.00      240.50    2.50        1.05
-max    2859263.00  2859263.00    0.00        0.00","         Original        MCAR    Diff  Pct_Change
-count     7902.00     7479.00 -423.00        5.35
-mean      8322.46     8457.79  135.33        1.63
-std      54181.76    55147.98  966.22        1.78
-min          0.00        0.00    0.00         NaN
-25%         12.00       12.00    0.00        0.00
-50%         73.00       74.00    1.00        1.37
-75%        947.00      949.50    2.50        0.26
-max    2103272.00  2103272.00    0.00        0.00","           Original          MCAR       Diff  Pct_Change
-count  7.902000e+03  7.525000e+03    -377.00        4.77
-mean   1.514359e+06  1.555254e+06   40895.61        2.70
-std    1.042255e+07  1.063912e+07  216573.51        2.08
-min    1.000000e+00  1.000000e+00       0.00        0.00
-25%    1.966000e+03  1.976000e+03      10.00        0.51
-50%    1.300850e+04  1.331300e+04     304.50        2.34
-75%    1.253638e+05  1.274840e+05    2120.25        1.69
-max    1.344500e+08  1.344500e+08       0.00        0.00","         Original        MCAR    Diff  Pct_Change
-count     7902.00     7505.00 -397.00        5.02
-mean      6089.61     6190.10  100.50        1.65
-std      44647.87    45637.08  989.21        2.22
-min          0.00        0.00    0.00         NaN
-25%        255.25      257.00    1.75        0.69
-50%        753.50      757.00    3.50        0.46
-75%       1992.00     1992.00    0.00        0.00
-max    2021471.00  2021471.00    0.00        0.00","        Original       MCAR    Diff  Pct_Change
-count    7902.00    7495.00 -407.00        5.15
-mean     2911.67    2915.93    4.26        0.15
-std     13949.16   13975.03   25.87        0.19
-min         0.00       0.00    0.00         NaN
-25%        19.00      19.00    0.00        0.00
-50%       134.00     130.00   -4.00        2.99
-75%       906.75     901.50   -5.25        0.58
-max    218340.00  218340.00    0.00        0.00","         Original        MCAR    Diff  Pct_Change
-count     7902.00     7522.00 -380.00        4.81
-mean     23641.58    23773.43  131.85        0.56
-std      60666.39    60705.89   39.50        0.07
-min          0.00        0.00    0.00         NaN
-25%        889.25      893.00    3.75        0.42
-50%       4451.00     4562.00  111.00        2.49
-75%      19681.00    20011.00  330.00        1.68
-max    1146945.00  1146945.00    0.00        0.00","         Original        MCAR    Diff  Pct_Change
-count     7902.00     7504.00 -398.00        5.04
-mean     37550.28    38005.49  455.21        1.21
-std      98988.84    99797.92  809.07        0.82
-min          1.00        1.00    0.00        0.00
-25%       1537.25     1552.75   15.50        1.01
-50%       8008.00     8093.00   85.00        1.06
-75%      30092.50    30673.50  581.00        1.93
-max    1283847.00  1283847.00    0.00        0.00"
+,Feature,Metric,Original,MCAR,Diff,Pct_Change
+0,quoted_status.retweet_count,count,1465.0,1398.0,-67.0,4.57
+1,quoted_status.retweet_count,mean,1367.8,1369.04,1.24,0.09
+2,quoted_status.retweet_count,std,7334.05,7346.98,12.93,0.18
+3,quoted_status.retweet_count,min,0.0,0.0,0.0,
+4,quoted_status.retweet_count,25%,3.0,3.0,0.0,0.0
+5,quoted_status.retweet_count,50%,17.0,17.5,0.5,2.94
+6,quoted_status.retweet_count,75%,183.0,174.75,-8.25,4.51
+7,quoted_status.retweet_count,max,181096.0,181096.0,0.0,0.0
+8,quoted_status.favorite_count,count,1465.0,1364.0,-101.0,6.89
+9,quoted_status.favorite_count,mean,6924.23,6726.21,-198.02,2.86
+10,quoted_status.favorite_count,std,36849.71,34928.22,-1921.49,5.21
+11,quoted_status.favorite_count,min,0.0,0.0,0.0,
+12,quoted_status.favorite_count,25%,13.0,13.75,0.75,5.77
+13,quoted_status.favorite_count,50%,77.0,84.5,7.5,9.74
+14,quoted_status.favorite_count,75%,992.0,1058.25,66.25,6.68
+15,quoted_status.favorite_count,max,767402.0,767402.0,0.0,0.0
+16,quoted_status.user.followers_count,count,1465.0,1399.0,-66.0,4.51
+17,quoted_status.user.followers_count,mean,1442950.3,1479514.51,36564.21,2.53
+18,quoted_status.user.followers_count,std,9080746.1,9278273.84,197527.74,2.18
+19,quoted_status.user.followers_count,min,1.0,1.0,0.0,0.0
+20,quoted_status.user.followers_count,25%,2035.0,2009.0,-26.0,1.28
+21,quoted_status.user.followers_count,50%,16666.0,15791.0,-875.0,5.25
+22,quoted_status.user.followers_count,75%,136102.0,135376.0,-726.0,0.53
+23,quoted_status.user.followers_count,max,134449981.0,134449981.0,0.0,0.0
+24,quoted_status.user.friends_count,count,1465.0,1383.0,-82.0,5.6
+25,quoted_status.user.friends_count,mean,4041.85,4125.99,84.13,2.08
+26,quoted_status.user.friends_count,std,36260.97,37286.61,1025.63,2.83
+27,quoted_status.user.friends_count,min,0.0,0.0,0.0,
+28,quoted_status.user.friends_count,25%,243.0,242.0,-1.0,0.41
+29,quoted_status.user.friends_count,50%,727.0,737.0,10.0,1.38
+30,quoted_status.user.friends_count,75%,1745.0,1756.0,11.0,0.63
+31,quoted_status.user.friends_count,max,793068.0,793068.0,0.0,0.0
+32,quoted_status.user.listed_count,count,1465.0,1397.0,-68.0,4.64
+33,quoted_status.user.listed_count,mean,3770.37,3886.8,116.43,3.09
+34,quoted_status.user.listed_count,std,18386.66,18805.47,418.81,2.28
+35,quoted_status.user.listed_count,min,0.0,0.0,0.0,
+36,quoted_status.user.listed_count,25%,20.0,20.0,0.0,0.0
+37,quoted_status.user.listed_count,50%,170.0,173.0,3.0,1.76
+38,quoted_status.user.listed_count,75%,1018.0,1042.0,24.0,2.36
+39,quoted_status.user.listed_count,max,217952.0,217952.0,0.0,0.0
+40,quoted_status.user.favourites_count,count,1465.0,1403.0,-62.0,4.23
+41,quoted_status.user.favourites_count,mean,21905.65,22116.49,210.84,0.96
+42,quoted_status.user.favourites_count,std,54091.65,54624.11,532.46,0.98
+43,quoted_status.user.favourites_count,min,0.0,0.0,0.0,
+44,quoted_status.user.favourites_count,25%,861.0,858.5,-2.5,0.29
+45,quoted_status.user.favourites_count,50%,4491.0,4539.0,48.0,1.07
+46,quoted_status.user.favourites_count,75%,18125.0,18380.0,255.0,1.41
+47,quoted_status.user.favourites_count,max,952336.0,952336.0,0.0,0.0
+48,quoted_status.user.statuses_count,count,1465.0,1392.0,-73.0,4.98
+49,quoted_status.user.statuses_count,mean,45352.25,46335.44,983.19,2.17
+50,quoted_status.user.statuses_count,std,179265.3,183479.46,4214.16,2.35
+51,quoted_status.user.statuses_count,min,2.0,2.0,0.0,0.0
+52,quoted_status.user.statuses_count,25%,2092.0,2092.0,0.0,0.0
+53,quoted_status.user.statuses_count,50%,9075.0,9079.0,4.0,0.04
+54,quoted_status.user.statuses_count,75%,33085.0,33416.5,331.5,1.0
+55,quoted_status.user.statuses_count,max,3885920.0,3885920.0,0.0,0.0
+56,retweeted_status.retweet_count,count,8046.0,7642.0,-404.0,5.02
+57,retweeted_status.retweet_count,mean,2226.44,2175.74,-50.7,2.28
+58,retweeted_status.retweet_count,std,35049.18,35424.76,375.57,1.07
+59,retweeted_status.retweet_count,min,0.0,0.0,0.0,
+60,retweeted_status.retweet_count,25%,4.0,4.0,0.0,0.0
+61,retweeted_status.retweet_count,50%,21.0,21.0,0.0,0.0
+62,retweeted_status.retweet_count,75%,247.0,248.0,1.0,0.4
+63,retweeted_status.retweet_count,max,2859263.0,2859263.0,0.0,0.0
+64,retweeted_status.favorite_count,count,8046.0,7633.0,-413.0,5.13
+65,retweeted_status.favorite_count,mean,8389.41,8315.51,-73.9,0.88
+66,retweeted_status.favorite_count,std,54095.99,53501.14,-594.84,1.1
+67,retweeted_status.favorite_count,min,0.0,0.0,0.0,
+68,retweeted_status.favorite_count,25%,12.0,12.0,0.0,0.0
+69,retweeted_status.favorite_count,50%,75.0,75.0,0.0,0.0
+70,retweeted_status.favorite_count,75%,991.75,1005.0,13.25,1.34
+71,retweeted_status.favorite_count,max,2103272.0,2103272.0,0.0,0.0
+72,retweeted_status.user.followers_count,count,8046.0,7602.0,-444.0,5.52
+73,retweeted_status.user.followers_count,mean,1598523.94,1624710.45,26186.51,1.64
+74,retweeted_status.user.followers_count,std,10811346.97,10859520.44,48173.47,0.45
+75,retweeted_status.user.followers_count,min,1.0,1.0,0.0,0.0
+76,retweeted_status.user.followers_count,25%,2063.25,2097.0,33.75,1.64
+77,retweeted_status.user.followers_count,50%,13773.0,14117.0,344.0,2.5
+78,retweeted_status.user.followers_count,75%,130110.0,131416.75,1306.75,1.0
+79,retweeted_status.user.followers_count,max,134449985.0,134449985.0,0.0,0.0
+80,retweeted_status.user.friends_count,count,8046.0,7627.0,-419.0,5.21
+81,retweeted_status.user.friends_count,mean,6100.93,6243.32,142.39,2.33
+82,retweeted_status.user.friends_count,std,44380.67,45434.71,1054.04,2.37
+83,retweeted_status.user.friends_count,min,0.0,0.0,0.0,
+84,retweeted_status.user.friends_count,25%,258.25,258.0,-0.25,0.1
+85,retweeted_status.user.friends_count,50%,762.0,758.0,-4.0,0.52
+86,retweeted_status.user.friends_count,75%,2018.0,2030.0,12.0,0.59
+87,retweeted_status.user.friends_count,max,2021471.0,2021471.0,0.0,0.0
+88,retweeted_status.user.listed_count,count,8046.0,7642.0,-404.0,5.02
+89,retweeted_status.user.listed_count,mean,3031.57,3052.92,21.35,0.7
+90,retweeted_status.user.listed_count,std,14336.44,14477.95,141.51,0.99
+91,retweeted_status.user.listed_count,min,0.0,0.0,0.0,
+92,retweeted_status.user.listed_count,25%,20.0,20.0,0.0,0.0
+93,retweeted_status.user.listed_count,50%,141.0,141.0,0.0,0.0
+94,retweeted_status.user.listed_count,75%,934.0,944.25,10.25,1.1
+95,retweeted_status.user.listed_count,max,218340.0,218340.0,0.0,0.0
+96,retweeted_status.user.favourites_count,count,8046.0,7639.0,-407.0,5.06
+97,retweeted_status.user.favourites_count,mean,24064.95,24127.16,62.2,0.26
+98,retweeted_status.user.favourites_count,std,61353.57,61441.96,88.4,0.14
+99,retweeted_status.user.favourites_count,min,0.0,0.0,0.0,
+100,retweeted_status.user.favourites_count,25%,906.0,913.0,7.0,0.77
+101,retweeted_status.user.favourites_count,50%,4674.0,4673.0,-1.0,0.02
+102,retweeted_status.user.favourites_count,75%,20587.0,20530.5,-56.5,0.27
+103,retweeted_status.user.favourites_count,max,1146945.0,1146945.0,0.0,0.0
+104,retweeted_status.user.statuses_count,count,8046.0,7643.0,-403.0,5.01
+105,retweeted_status.user.statuses_count,mean,38265.56,38139.78,-125.78,0.33
+106,retweeted_status.user.statuses_count,std,99826.89,99530.58,-296.31,0.3
+107,retweeted_status.user.statuses_count,min,1.0,1.0,0.0,0.0
+108,retweeted_status.user.statuses_count,25%,1611.0,1626.0,15.0,0.93
+109,retweeted_status.user.statuses_count,50%,8310.0,8336.0,26.0,0.31
+110,retweeted_status.user.statuses_count,75%,31091.25,31156.0,64.75,0.21
+111,retweeted_status.user.statuses_count,max,1283847.0,1283847.0,0.0,0.0
