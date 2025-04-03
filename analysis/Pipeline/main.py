@@ -91,15 +91,13 @@ def main():
                         )
         },
         'DataProfiler': {
-            'output_dir': 'analysis_reports',
+            'output_dir': 'analysis/report/graphs',
             'analyze_correlations': True,
             'analyze_distributions': True
         }
     })
-    
     print("Pipeline completed!")
     print("Final data shape:", processed_data.shape)
-    
     # Save processed data
     processed_data.to_csv('data/processed/cleaned_data.csv', index=False)
 
