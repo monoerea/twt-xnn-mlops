@@ -1,3 +1,5 @@
 config.ini
 /venv
 .cpython
+/analysis_reports
+/final_report

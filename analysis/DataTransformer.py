@@ -217,15 +217,13 @@ if __name__ == '__main__':
     inspector.generate_report(output_dir=output_dir, strategies=strategies)
     ###################
     print([col for col in initial.columns if 'created_at' in col])
-    # Set up ColumnTransformer
+
 
     categorical_cols = df.select_dtypes(include=['object','bool']).columns.tolist()
 
-    # 2. Verify columns before transformation
     print("Columns being encoded:", categorical_cols)
     print("Sample data before:\n", df[categorical_cols].head())
 
-    # 3. Create and fit transformer
     preprocessor = ColumnTransformer(
         transformers=[
             ('ordinal', OrdinalEncoder(
@@ -238,7 +236,6 @@ if __name__ == '__main__':
         verbose_feature_names_out=False  # Cleaner column names
     )
 
-    # 4. Transform and CONVERT to DataFrame
     encoded_data = preprocessor.fit_transform(df)
     df_encoded = pd.DataFrame(
         encoded_data,
@@ -246,24 +243,19 @@ if __name__ == '__main__':
         index=df.index
     )
     new_columns = preprocessor.get_feature_names_out()
-    # 5. Verify output
     print("\nSample data after encoding:")
     print(df_encoded[categorical_cols].head())
     print("\nData types after encoding:")
     print(df_encoded[categorical_cols].dtypes)
 
-    # 5. Update original DataFrame properly
-    # First remove the columns we're about to replace
     df = df.drop(columns=categorical_cols, errors='ignore')
 
-    # Then join with the encoded columns
     df = df.join(df_encoded[new_columns[:len(categorical_cols)]])
     to_remove = df.columns[df.isna().mean() > 0.995]
     df = df.drop(columns=to_remove)
     df.to_csv('analysis/result/test.csv')
     X = df[df.columns.difference(['label'])]
 
-    # 1. Initialize RandomForest with optimized parameters
     estimator = RandomForestRegressor(
         n_estimators=50,
         max_samples=0.5,
@@ -272,9 +264,6 @@ if __name__ == '__main__':
         n_jobs=-1,
         random_state=21
     )
-
-    # 2. Fit the estimator on complete cases only
-    # First drop rows where target (y) is missing
     complete_cases = y.notna()
     X_complete = X[complete_cases]
     y_complete = y[complete_cases]
