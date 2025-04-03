@@ -67,7 +67,7 @@ class FeatureEngineer(PipelineStep):
         df = data.copy()
         
         # Handle datetime columns
-        if config.get('process_datetime', False):
+        if config.get('process_datetime', True):
             date_cols = config.get('datetime_columns', None)
             df = self._process_datetime(df, date_cols)
         
@@ -75,38 +75,83 @@ class FeatureEngineer(PipelineStep):
         if config.get('encode_categorical', False):
             cat_cols = config.get('categorical_columns', None)
             method = config.get('encoding_method', 'numerical')
-            print(df.isna().mean())
             df = self._encode_categorical(df, cat_cols, method)
             print(df.isna().mean().dtypes)
+        
         
         return df
     
     def _process_datetime(self, df: pd.DataFrame, cols: List[str] = None) -> pd.DataFrame:
-        """Extract features from datetime columns"""
+        """Convert datetime columns to numeric features with proper timezone handling"""
+        # Set reference date with UTC timezone to match Twitter's datetime format
+        reference_date = pd.Timestamp('1970-01-01', tz='UTC')
+        
+        # Identify datetime columns if not specified
         if cols is None:
-            # Try to detect datetime columns
-            cols = df.select_dtypes(include=['datetime']).columns.tolist()
+            cols = [col for col in df.columns 
+                if pd.api.types.is_datetime64_any_dtype(df[col]) or 
+                    'created_at' in col.lower() or 
+                    'date' in col.lower()]
+        
+        cols_to_drop = []
         
         for col in cols:
             if col in df.columns:
-                df[f'{col}_year'] = df[col].dt.year
-                df[f'{col}_month'] = df[col].dt.month
-                df[f'{col}_day'] = df[col].dt.day
-                df[f'{col}_dayofweek'] = df[col].dt.dayofweek
+                # Convert to datetime with UTC timezone (matching Twitter's format)
+                try:
+                    df[col] = pd.to_datetime(df[col], utc=True, errors='coerce')
+                except TypeError:
+                    # Fallback if column is already datetime but not timezone-aware
+                    df[col] = pd.to_datetime(df[col], errors='coerce').dt.tz_localize('UTC')
+                
+                # Only proceed if conversion was successful
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                    # Ensure timezone is consistent
+                    if df[col].dt.tz is None:
+                        df[col] = df[col].dt.tz_localize('UTC')
+                    elif df[col].dt.tz != reference_date.tz:
+                        df[col] = df[col].dt.tz_convert('UTC')
+                    
+                    # Basic datetime features
+                    df[f'{col}_year'] = df[col].dt.year.astype('float32')
+                    df[f'{col}_quarter'] = df[col].dt.quarter.astype('float32')
+                    df[f'{col}_month'] = df[col].dt.month.astype('float32')
+                    df[f'{col}_day'] = df[col].dt.day.astype('float32')
+                    df[f'{col}_dayofweek'] = df[col].dt.dayofweek.astype('float32')
+                    df[f'{col}_hour'] = df[col].dt.hour.astype('float32')
+                    df[f'{col}_minute'] = df[col].dt.minute.astype('float32')
+                    
+                    # Derived features
+                    df[f'{col}_is_weekend'] = (df[col].dt.dayofweek >= 5).astype('float32')
+                    
+                    # Timezone-aware date difference calculation
+                    df[f'{col}_days_since_ref'] = (
+                        (df[col] - reference_date).dt.total_seconds() / (24 * 3600)
+                    ).astype('float32')
+                    
+                    # Cyclical features
+                    df[f'{col}_month_sin'] = np.sin(2 * np.pi * df[col].dt.month/12).astype('float32')
+                    df[f'{col}_month_cos'] = np.cos(2 * np.pi * df[col].dt.month/12).astype('float32')
+                    df[f'{col}_dayofweek_sin'] = np.sin(2 * np.pi * df[col].dt.dayofweek/7).astype('float32')
+                    df[f'{col}_dayofweek_cos'] = np.cos(2 * np.pi * df[col].dt.dayofweek/7).astype('float32')
+                    df[f'{col}_hour_sin'] = np.sin(2 * np.pi * df[col].dt.hour/24).astype('float32')
+                    df[f'{col}_hour_cos'] = np.cos(2 * np.pi * df[col].dt.hour/24).astype('float32')
+                    
+                    cols_to_drop.append(col)
         
-        return df
-    
+        return df.drop(columns=cols_to_drop, errors='ignore')
+
+
     def _encode_categorical(self, df: pd.DataFrame, cols: List[str] = None,
-                          method: str = 'onehot') -> pd.DataFrame:
+    method: str = 'onehot') -> pd.DataFrame:
         """Encode categorical variables"""
-        # If no categorical columns specified, choose object dtype columns by default
-        if cols is None:
-            cols = df.select_dtypes(include=['object']).columns.tolist()
-        cols = [col for col in cols if col in df.columns]
+        if cols is None or len(cols) == 0:
+            return df
+        cols = [col for col in cols if col in df.select_dtypes(include=['object']).columns.tolist() and not pd.api.types.is_datetime64_any_dtype(df[col])]
+
         if method == 'onehot':
             # One-hot encoding using pd.get_dummies
             return pd.get_dummies(df, columns=cols)
-        
         elif method == 'ordinal':
             # Ordinal encoding (convert to category first if it's an object)
             for col in cols:
@@ -124,13 +169,13 @@ class FeatureEngineer(PipelineStep):
             return df
     
     def _encode_numerical(self, df: pd.DataFrame, cols: List[str] = None) -> pd.DataFrame:
-        """Numerically encode categorical columns using OrdinalEncoder"""
+        """Numerically encode categorical columns using OrdinalEncoder, handling NaNs before encoding"""
         if cols is None:
             cols = df.select_dtypes(include=['object']).columns.tolist()
 
         preprocessor = ColumnTransformer(
-            transformers=[
-                ('ordinal', OrdinalEncoder(
+            transformers=[(
+                'ordinal', OrdinalEncoder(
                     handle_unknown='use_encoded_value',
                     unknown_value=-1,
                     encoded_missing_value=-2  # Handle NaN values
@@ -149,19 +194,32 @@ class FeatureEngineer(PipelineStep):
             columns=preprocessor.get_feature_names_out(),
             index=df.index
         )
+        
 
         return df_encoded
+
 class Imputer(PipelineStep):
     """Handles missing value imputation with multiple strategies"""
-    
+
     def process(self, data: pd.DataFrame, config: Dict = None) -> pd.DataFrame:
         config = config or {}
         df = data.copy()
-        
+
+        # Track missing values before any imputation
+        self.logger.info("Missing values before imputation:")
+        self.logger.info(df.isna().mean())
+    
         strategy = config.get('strategy', 'median')
-        numeric_cols = df.select_dtypes(include='number').columns.tolist()
+        print("HASCOLUMNS",df.dtypes)
+        # Get numeric columns excluding datetime columns
+        df = df.apply(lambda col: pd.to_numeric(col, errors='ignore') if col.dtypes == 'object' else col)
+        numeric_cols = [col for col in df.select_dtypes(include='number').columns]
+
+
+        print('THE NUMERIC_COLS', numeric_cols)
+        # Get categorical columns (object/string columns)
         categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-        
+
         if strategy == 'simple':
             df = self._simple_impute(df, numeric_cols, categorical_cols, config)
         elif strategy == 'knn':
@@ -171,30 +229,32 @@ class Imputer(PipelineStep):
         else:
             self.logger.warning(f"Unknown imputation strategy: {strategy}. Using 'simple' as fallback.")
             df = self._simple_impute(df, numeric_cols, categorical_cols, config)
-        df.to_csv('test.csv')
-        print(df[numeric_cols].isna().mean())
+
+        # Track missing values after imputation
+        self.logger.info("Missing values after imputation:")
+        self.logger.info(df.isna().mean())
         return df
-    
+
     def _simple_impute(self, df: pd.DataFrame, numeric_cols: List[str], 
                       categorical_cols: List[str], config: Dict) -> pd.DataFrame:
-        """Simple imputation with different strategies for numeric and categorical data"""
-        numeric_strategy = config.get('numeric_strategy', 'median')
+        """Simple imputation using mean/median/most_frequent"""
+        numeric_strategy = config.get('numeric_stratery', 'median')  # Note: typo in config key
         categorical_strategy = config.get('categorical_strategy', 'most_frequent')
-        
+
         # Impute numeric columns
         if numeric_cols:
             num_imputer = SimpleImputer(strategy=numeric_strategy)
             df[numeric_cols] = num_imputer.fit_transform(df[numeric_cols])
-        
+
         # Impute categorical columns
         if categorical_cols:
             cat_imputer = SimpleImputer(strategy=categorical_strategy)
             df[categorical_cols] = cat_imputer.fit_transform(df[categorical_cols])
-        
+
         return df
-    
+
     def _knn_impute(self, df: pd.DataFrame, numeric_cols: List[str], config: Dict) -> pd.DataFrame:
-        """KNN-based imputation for numeric columns"""
+        """KNN imputation for numeric columns"""
         n_neighbors = config.get('n_neighbors', 5)
         
         if numeric_cols:
@@ -202,21 +262,32 @@ class Imputer(PipelineStep):
             df[numeric_cols] = knn_imputer.fit_transform(df[numeric_cols])
         
         return df
-    
+
     def _iterative_impute(self, df: pd.DataFrame, numeric_cols: List[str], config: Dict) -> pd.DataFrame:
         """Iterative imputation for numeric columns"""
         max_iter = config.get('max_iter', 10)
         random_state = config.get('random_state', 21)
         estimator = config.get('estimator', BayesianRidge())
-        if isinstance(estimator, RandomForestRegressor()):
-            y = df['label']
-            df = df[df.columns.difference('label')]
-            complete_cases = y.notna()
-            x_complete = df[complete_cases]
-            y_complete = y[complete_cases]
-            estimator.fit(X=x_complete, y=y_complete)
+
+        print("df",df)
+        print(numeric_cols)
+
+        if 'label' in df.columns:
+            y = df['label'].apply(lambda x: 1 if x == 'bot' else 0)
+        if isinstance(estimator, RandomForestRegressor):
+            # Handle case where 'label' column exists
+            if y is not None:
+                x = df[numeric_cols]
+                print("IMPUTERR",x.columns, y)
+                estimator.fit(X=x, y=y)
+
         if numeric_cols:
-            it_imputer = IterativeImputer(estimator=estimator, max_iter=max_iter, random_state=random_state)
+            it_imputer = IterativeImputer(
+                estimator=estimator,
+                max_iter=max_iter,
+                random_state=random_state
+            )
             df[numeric_cols] = it_imputer.fit_transform(df[numeric_cols])
         
         return df
+

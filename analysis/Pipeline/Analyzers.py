@@ -84,8 +84,6 @@ class DataProfiler(PipelineStep):
     
     def _analyze_correlations(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Analyze correlations between numeric columns"""
-        print('\n IN DATA PROFILER',df.select_dtypes(include="number"))
-        df.to_csv('test.csv')
         numeric_cols = df.select_dtypes(include='number').columns
         if len(numeric_cols) < 2:
             return {'error': 'Not enough numeric columns for correlation analysis'}
@@ -111,7 +109,6 @@ class DataProfiler(PipelineStep):
     def _save_correlation_report(self, corr_data: Dict[str, Any], output_dir: str):
         """Save correlation analysis to CSV files"""
         # Save full correlation matrix
-        print(corr_data)
         corr_data['correlation_matrix'].to_csv(os.path.join(output_dir,'correlation_matrix.csv'))
         
         # Save significant correlations
