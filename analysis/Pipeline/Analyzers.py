@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 from typing import Dict, Any
-from Pipeline import PipelineStep
+from analysis.Pipeline.Pipeline import PipelineStep
 
 class DataProfiler(PipelineStep):
     """Basic data profiling and analysis"""
     
     def process(self, data: pd.DataFrame, config: Dict = None) -> pd.DataFrame:
         config = config or {}
-        output_dir = config.get('output_dir', 'reports')
+        output_dir = config.get('output_dir')
         
         # Create output directory if needed
         if output_dir:

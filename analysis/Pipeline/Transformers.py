@@ -7,7 +7,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import IterativeImputer, KNNImputer, SimpleImputer
 from sklearn.linear_model import BayesianRidge
 from sklearn.preprocessing import OrdinalEncoder
-from Pipeline import PipelineStep
+from analysis.Pipeline.Pipeline import PipelineStep
 
 class Cleaner(PipelineStep):
     """Basic data cleaning operations"""
@@ -212,11 +212,8 @@ class Imputer(PipelineStep):
         strategy = config.get('strategy', 'median')
         print("HASCOLUMNS",df.dtypes)
         # Get numeric columns excluding datetime columns
-        df = df.apply(lambda col: pd.to_numeric(col, errors='ignore') if col.dtypes == 'object' else col)
+        # df = df.apply(lambda col: pd.to_numeric(col, errors='ignore') if col.dtypes == 'object' else col)
         numeric_cols = [col for col in df.select_dtypes(include='number').columns]
-
-
-        print('THE NUMERIC_COLS', numeric_cols)
         # Get categorical columns (object/string columns)
         categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
 
@@ -256,11 +253,9 @@ class Imputer(PipelineStep):
     def _knn_impute(self, df: pd.DataFrame, numeric_cols: List[str], config: Dict) -> pd.DataFrame:
         """KNN imputation for numeric columns"""
         n_neighbors = config.get('n_neighbors', 5)
-        
         if numeric_cols:
             knn_imputer = KNNImputer(n_neighbors=n_neighbors)
             df[numeric_cols] = knn_imputer.fit_transform(df[numeric_cols])
-        
         return df
 
     def _iterative_impute(self, df: pd.DataFrame, numeric_cols: List[str], config: Dict) -> pd.DataFrame:
