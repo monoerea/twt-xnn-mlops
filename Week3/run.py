@@ -2,6 +2,9 @@ import os
 import re
 import sys
 
+from sklearn.calibration import LabelEncoder
+from sklearn.ensemble import RandomForestRegressor
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 from analysis.Pipeline.DataInspector import DataInspector
@@ -25,6 +28,7 @@ def load_data():
                                 right_on="id",
                                 sort=True,
                                 suffixes=('_beer', '_brewery'))
+    beers_and_breweries.to_csv('Week3/analysis/beers_and_breweries.csv', index=False)
     return beers_and_breweries
 
 
@@ -48,17 +52,46 @@ def inspect_data(df):
 
 def data_analysis(df):
     print(df.head())
+    estimator = RandomForestRegressor(
+                                        n_estimators=10,
+                                        max_depth=5,
+                                        random_state=21,
+                                        n_jobs=-1
+                                        )
+    lbl = LabelEncoder()
+    df['style'] = lbl.fit_transform(df['style'])
+    y= df['style']
+    print(y)
+    X = df.drop(columns=['id_beer', 'id_brewery','style']),
+    estimator.fit(X, y)
     pipeline = Pipeline(
         steps=[
             {
-                'MissingValueHandler': {
-                        'strategy': 'removed_missing',
+                'MissingValueRemover': {
+                        'name': 'missing_value_remover',
+                        'strategy': 'remove_missing',
                         'minimum': 0.75,
                         'maximum': 1,
                         'to_iterate': False
-                    }
+                    },
                 }
             ,
+            {
+                'DataImputer': {
+                        'name': 'data_transformer',
+                        'strategy': 'iterative',
+                        'estimator': estimator,
+                        'params': {
+                            'max_iter': 10,
+                            'imputation_order': 'ascending',
+                            'skip_complete': False,
+                            'skip_features': ['id', 'brewery_id'],
+                            'min_value': 0,
+                            'max_value': 100,
+                            'add_indicator': True,
+                        },
+                    },
+                }
         ]
     )
     df = pipeline.fit_transform(df)

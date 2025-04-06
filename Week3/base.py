@@ -47,11 +47,8 @@ class PipelineStep(PipelineComponent):
         self.fit(data, config)
         return self.transform(data, config)
 
-
-        return result
-
-class Cleaner(PipelineStep):
-    """Base class for all cleaners in the pipeline."""
+class Preprocess(PipelineStep):
+    """Base class for all proprocess in the pipeline."""
 
     def __init__(self, name: str = None):
         super().__init__(name or self.__class__.__name__)

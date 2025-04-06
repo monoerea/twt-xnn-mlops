@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Type
 
 import pandas as pd
 from base import PipelineComponent, PipelineStep, StepConfig
-from cleaners import MissingValueHandler
+from Week3.transformers import MissingValueRemover
 
 
 class Pipeline(PipelineComponent):
@@ -29,30 +29,33 @@ class Pipeline(PipelineComponent):
                         params=step_args)
                     )
         return steps
-    def _get_step_class(self, step_name: str) -> Type[PipelineStep]:
+    def _get_step_class(self, class_name: str) -> Type[PipelineStep]:
         """Resolve step class by name - only called during execution."""
-        return {
-            "MissingValueHandler": MissingValueHandler,
-            # Add other step mappings here
-        }.get(step_name)
+        classes = {
+            "MissingValueRemover": MissingValueRemover,
+        }
+        target_class = classes.get(class_name)
+        self.logger.info(f"Step class: { target_class}")
+        return target_class
+
     def fit_transform(self, data: pd.DataFrame, step_configs: List[Dict] = None) -> pd.DataFrame:
         """Run all steps on the data"""
         result = data.copy()
         print(self.steps)
-        steps_to_execute = self.steps
-        # (self._create_steps(step_configs)
-        #             if step_configs is not None
-        #             else self.steps)
+        steps_to_execute = (self._create_steps(step_configs)
+                if step_configs is not None
+                else self.steps)
         if not steps_to_execute:
             self.logger.warning("No steps configured in pipeline")
             return result
-        self.logger.info(f"Starting pipeline execution with {len(steps_to_execute)} steps")
+        self.logger.info(f"Starting pipeline execution with {len(steps_to_execute)} steps, steps: {steps_to_execute}")
         for step in steps_to_execute:
             try:
                 self.logger.info(f"Running step: {step.name}")
                 config = step.params
                 self.logger.info(f"Step {step.name} params: {config['strategy']}")
                 step_instance = self._get_step_class(step.step)(name=step.name)
+                self.logger.info(f"Step {step_instance} instance created")
                 step_instance.set_config(config=config)
                 result = step_instance.fit_transform(result, config)
                 self.logger.info(f"Step {step.name} completed successfully")

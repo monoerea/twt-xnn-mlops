@@ -106,7 +106,7 @@ class TTestStrategy(AnalysisStrategy):
             mask = df[col].sample(frac=sample_frac, random_state=random_state).index
             df_copy.loc[mask, col] = np.nan
             missing_mask = df_copy[col].isna()
-            
+
             # Calculate statistics
             result = self._calculate_stats(df, col, missing_mask)
             if result:
