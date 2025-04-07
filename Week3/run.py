@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 from analysis.Pipeline.DataInspector import DataInspector
 from Week3.pipeline import Pipeline
+from Week3.transformers import CategoricalEncoder
 
 import pandas as pd
 
@@ -52,17 +53,20 @@ def inspect_data(df):
 
 def data_analysis(df):
     print(df.head())
+    object_columns = df.select_dtypes(include=['object']).columns
+    print("Object columns:", object_columns)
     estimator = RandomForestRegressor(
                                         n_estimators=10,
                                         max_depth=5,
                                         random_state=21,
                                         n_jobs=-1
                                         )
-    lbl = LabelEncoder()
-    df['style'] = lbl.fit_transform(df['style'])
-    y= df['style']
-    print(y)
-    X = df.drop(columns=['id_beer', 'id_brewery','style']),
+    encoder  = CategoricalEncoder()
+
+    df = encoder.fit_transform(df, {'ordinal': object_columns})
+    print(df[object_columns].head())
+    y = df['style']
+    X = df.drop(columns=['style']),
     estimator.fit(X, y)
     pipeline = Pipeline(
         steps=[

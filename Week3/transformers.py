@@ -160,21 +160,55 @@ class LogScaler(BaseEstimator, TransformerMixin):
     def __init__(self, base: float = np.e):
         self.base = base
 
-    def fit(self, X: ArrayLike, y: Optional[pd.Series] = None) -> 'LogScaler':
-        X = check_array(X, accept_sparse=False, ensure_2d=False, dtype=['numeric'])
-        if np.any(X <= 0):
+    def fit(self, x: ArrayLike, y: Optional[pd.Series] = None) -> 'LogScaler':
+        x = check_array(x, accept_sparse=False, ensure_2d=False, dtype=['numeric'])
+        if np.any(x <= 0):
             raise ValueError("Logarithmic scaling requires all values to be positive.")
-        self.n_features_in_ = X.shape[1]
-        if (hasattr(X, "columns")) and (X.columns is not None):
-            self.feature_names_in_ = np.array(X.columns)
+        self.n_features_in_ = x.shape[1]
+        if (hasattr(x, "columns")) and (x.columns is not None):
+            self.feature_names_in_ = np.array(x.columns)
         return self
 
-    def transform(self, X: ArrayLike) -> pd.DataFrame:
+    def transform(self, x: ArrayLike) -> pd.DataFrame:
         check_is_fitted(self, self.n_features_in_)
-        X = check_array(X, accept_sparse=False, ensure_2d=False, dtype=['numeric'])
-        if np.any(X <= 0):
+        x = check_array(x, accept_sparse=False, ensure_2d=False, dtype=['numeric'])
+        if np.any(x <= 0):
             raise ValueError("Logarithmic scaling requires all values to be positive.")
-        if X.shape[1] != self.n_features_in_:
-            raise ValueError(f"Expected {self.n_features_in_} features, got {X.shape[1]}")
-        result = pd.DataFrame(np.log(X) / np.log(self.base), columns=self.feature_names_in_, index=X.index)
+        if x.shape[1] != self.n_features_in_:
+            raise ValueError(f"Expected {self.n_features_in_} features, got {x.shape[1]}")
+        result = pd.DataFrame(np.log(x) / np.log(self.base), columns=self.feature_names_in_, index=x.index)
         return result
+class CategoricalEncoder(Preprocess):
+    """Handle categorical data in the data."""
+
+    def __init__(self, name: str = None):
+        super().__init__(name or self.__class__.__name__)
+
+    def transform(self, data: Any, config: Dict = None) -> Any:
+        """Process the data to handle categorical data."""
+        strategy = config.get('strategy', 'ordinal')
+        self.logger.info(f"Encoding categorical variables with strategy: {strategy}")
+        if strategy == "ordinal":
+            self.logger.info(f"Shape before ordinal encoding: {data.shape}")
+            from sklearn.preprocessing import OrdinalEncoder
+            ordinal_encoder = OrdinalEncoder()
+            object_columns = data.select_dtypes(include=['object']).columns
+            encoded_colummns = ordinal_encoder.fit_transform(data[object_columns])
+            self.logger.info("Encoding categorical variables with ordinal encoding")
+            data[object_columns] = pd.DataFrame(encoded_colummns, columns=object_columns, index=data.index)
+            self.logger.info(f"Categories encoded: {ordinal_encoder.categories_}")
+            self.logger.info(f"Shape after ordinal encoding: {data.shape}")
+        elif strategy == "onehot":
+            self.logger.info("Encoding categorical variables with one-hot encoding")
+            data = pd.get_dummies(data, drop_first=True)
+            self.logger.info(f"Shape after one-hot encoding: {data.shape}")
+        elif strategy == "label":
+            from sklearn.preprocessing import LabelEncoder
+            label_encoder = LabelEncoder()
+            for col in data.select_dtypes(include=['object']).columns:
+                data[col] = label_encoder.fit_transform(data[col])
+            self.logger.info("Encoding categorical variables with label encoding")
+            self.logger.info(f"Shape after label encoding: {data.shape}")
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        return data
