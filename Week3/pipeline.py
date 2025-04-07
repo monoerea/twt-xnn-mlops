@@ -2,7 +2,7 @@ from typing import Dict, List, Optional, Type
 
 import pandas as pd
 from base import PipelineComponent, PipelineStep, StepConfig
-from Week3.transformers import MissingValueRemover
+from Week3.transformers import DataImputer, DataScaler, MissingValueRemover
 
 
 class Pipeline(PipelineComponent):
@@ -33,6 +33,8 @@ class Pipeline(PipelineComponent):
         """Resolve step class by name - only called during execution."""
         classes = {
             "MissingValueRemover": MissingValueRemover,
+            "DataImputer": DataImputer,
+            "DataScaler": DataScaler,
         }
         target_class = classes.get(class_name)
         self.logger.info(f"Step class: { target_class}")

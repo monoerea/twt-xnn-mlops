@@ -113,6 +113,7 @@ class DataImputer(Preprocess):
                 'estimator': estimator,
                 'max_iter': 10,
                 'tol': 0.001,
+                'randoem_state': 21,
                 'n_nearest_features': None,
                 'skip_complete': False,
                 'imputation_order': 'ascending',
@@ -121,7 +122,8 @@ class DataImputer(Preprocess):
             })
             imputer = IterativeImputer(**params)
             self.logger.info(f"Imputer params: {params}")
-            data = imputer.fit_transform(data)
+            data = pd.DataFrame(imputer.fit_transform(data), columns=data.columns, index=data.index)
+
             self.logger.info("Imputing missing values with Iterative Imputer")
 
         else:
@@ -149,8 +151,11 @@ class DataScaler(Preprocess):
                 data = scaler.fit_transform(data)
                 self.logger.info("Robust scaling applied")
             elif strategy == "log":
-                log_scaler = LogScaler()
-                data = log_scaler.fit_transform(data)
+                base = config.get('base', np.e)
+                log_scaler = LogScaler(base=base)
+                self.logger.info(f"Log scaling with data{data} and base {base}")
+                result = log_scaler.fit_transform(data)
+                data = pd.DataFrame(result, columns=data.columns, index=data.index)
                 self.logger.info("Log scaling applied")
             return data
 
@@ -160,23 +165,25 @@ class LogScaler(BaseEstimator, TransformerMixin):
     def __init__(self, base: float = np.e):
         self.base = base
 
-    def fit(self, x: ArrayLike, y: Optional[pd.Series] = None) -> 'LogScaler':
-        x = check_array(x, accept_sparse=False, ensure_2d=False, dtype=['numeric'])
-        if np.any(x <= 0):
+    def fit(self, x: pd.DataFrame, y: Optional[pd.Series] = None) -> 'LogScaler':
+        x = check_array(x, accept_sparse=False, ensure_2d=False)
+        if np.any(x <= -1):
             raise ValueError("Logarithmic scaling requires all values to be positive.")
         self.n_features_in_ = x.shape[1]
         if (hasattr(x, "columns")) and (x.columns is not None):
-            self.feature_names_in_ = np.array(x.columns)
+            self.feature_names_in_ = x.columns
+        else:
+            self.feature_names_in_ = [f"feature_{i}" for i in range(self.n_features_in_)]
         return self
 
-    def transform(self, x: ArrayLike) -> pd.DataFrame:
-        check_is_fitted(self, self.n_features_in_)
-        x = check_array(x, accept_sparse=False, ensure_2d=False, dtype=['numeric'])
-        if np.any(x <= 0):
-            raise ValueError("Logarithmic scaling requires all values to be positive.")
+    def transform(self, x:  pd.DataFrame) -> pd.DataFrame:
+        check_is_fitted(self, attributes=['n_features_in_'])
+        if not hasattr(self, 'feature_names_in_'):
+            raise ValueError("The fit method must be called before transform.")
+        x = check_array(x, accept_sparse=False, ensure_2d=False)
         if x.shape[1] != self.n_features_in_:
             raise ValueError(f"Expected {self.n_features_in_} features, got {x.shape[1]}")
-        result = pd.DataFrame(np.log(x) / np.log(self.base), columns=self.feature_names_in_, index=x.index)
+        result = np.log1p(x) / np.log(self.base)
         return result
 class CategoricalEncoder(Preprocess):
     """Handle categorical data in the data."""

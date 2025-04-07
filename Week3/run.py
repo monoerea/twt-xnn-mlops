@@ -65,9 +65,6 @@ def data_analysis(df):
 
     df = encoder.fit_transform(df, {'ordinal': object_columns})
     print(df[object_columns].head())
-    y = df['style']
-    X = df.drop(columns=['style']),
-    estimator.fit(X, y)
     pipeline = Pipeline(
         steps=[
             {
@@ -89,17 +86,23 @@ def data_analysis(df):
                             'max_iter': 10,
                             'imputation_order': 'ascending',
                             'skip_complete': False,
-                            'skip_features': ['id', 'brewery_id'],
-                            'min_value': 0,
-                            'max_value': 100,
-                            'add_indicator': True,
                         },
                     },
-                }
+                },
+            {
+                'DataScaler': {
+                        'name': 'log_scaler',
+                        'strategy': 'log',
+                        'params': {
+                            'base': 10,
+                        },
+                    },
+                },
         ]
     )
     df = pipeline.fit_transform(df)
     print(df)
+    df.to_csv('Week3/analysis/processed_data.csv', index=False)
 
 def main():
     df = load_data()
