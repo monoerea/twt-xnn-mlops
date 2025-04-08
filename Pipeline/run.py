@@ -114,6 +114,14 @@ def data_analysis(df):
                 }
             },
             {
+                'DataProfiler': {
+                    'name': 'distributions',
+                    'output_dir':output_dir,
+                    'strategy':'group_py',
+                    'features':['style']
+                }
+            },
+            {
                 'CorrelationHeatmap':{
                     'name': 'CorrelationHeatmap',
                     'strategy':'pearson',

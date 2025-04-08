@@ -28,6 +28,9 @@ class DataProfiler(Analysis):
         if config.get('strategy','analyze_distributions'):
             self._analyze_distributions(data, output_dir)
 
+        if config.get('strategy','group_by'):
+            self.group_by(data, output_dir)
+
         return data
 
     def _basic_stats(self, df: pd.DataFrame) -> Dict[str, Any]:
@@ -130,7 +133,53 @@ class DataProfiler(Analysis):
             plt.tight_layout()
             plt.savefig(plot_path)
             plt.close()
-
+    def group_by(self, df: pd.DataFrame, output_dir: str):
+        """Generate bar plots showing grouped aggregations of features.
+        
+        Args:
+            df: Input DataFrame
+            output_dir: Directory to save output plots
+        """
+        import re
+        
+        features = self.config.get('features', df.columns.tolist())
+        
+        # Create output directory structure if it doesn't exist
+        os.makedirs(os.path.join(output_dir, 'group_by'), exist_ok=True)
+        
+        for feat in features:
+            # Sanitize feature name for directory
+            safe_feat = re.sub(r'[<>:"/\\|?*]', '_', str(feat))
+            
+            # Create feature subdirectory
+            feat_dir = os.path.join(output_dir, 'group_by', safe_feat)
+            os.makedirs(feat_dir, exist_ok=True)
+            
+            for col in df.columns:
+                if col == feat:  # Skip grouping by same column
+                    continue
+                    
+                try:
+                    # Sanitize column name for filename
+                    safe_col = re.sub(r'[<>:"/\\|?*]', '_', str(col))
+                    
+                    # Group and aggregate data
+                    grouped = df.groupby(feat)[col].mean()  # Using mean as default aggregation
+                    
+                    # Create and save plot
+                    plt.figure(figsize=(10, 6))
+                    grouped.plot(kind='bar')
+                    plt.title(f'{col} grouped by {feat}')
+                    plt.ylabel(col)
+                    plt.tight_layout()
+                    
+                    filename = f'{safe_feat}_by_{safe_col}.png'
+                    plot_path = os.path.join(feat_dir, filename)
+                    plt.savefig(plot_path)
+                    plt.close()
+                    
+                except Exception as e:
+                    print(f"Error processing {feat} by {col}: {str(e)}")
 class CorrelationHeatmap(Analysis):
     """
     A class to create correlation heatmaps with various methods and column selection options.
@@ -221,6 +270,20 @@ class CorrelationHeatmap(Analysis):
         corr = selected_data.corr(method=method)
         return self._plot_heatmap(corr, **kwargs)
 
+class DataTrends(Analysis):
+    """Class that outputs a line chart for the given feature.
+
+    Args:
+        Analysis (PipelineStep)
+    """
+    def __init__(self, name = None):
+        super().__init__(name or self.__class__.__name__)
+    def transform(self, data, config = None):
+        feature = config.get('feature', None)
+        if feature not in data.columns:
+            return data
+        
+        return data
 if __name__ == '__main__':
     df = pd.read_csv('Pipeline/analysis/cleaned_data.csv')
     heatmap = CorrelationHeatmap(df, title='Feature Correlations')
