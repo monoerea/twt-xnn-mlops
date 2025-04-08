@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional, Type
 
 import pandas as pd
+from Week3.DataAnalysis import CorrelationHeatmap
 from base import PipelineComponent, PipelineStep, StepConfig
 from Week3.transformers import DataImputer, DataScaler, MissingValueRemover
 
@@ -35,6 +36,7 @@ class Pipeline(PipelineComponent):
             "MissingValueRemover": MissingValueRemover,
             "DataImputer": DataImputer,
             "DataScaler": DataScaler,
+            "CorrelationHeatmap": CorrelationHeatmap,
         }
         target_class = classes.get(class_name)
         self.logger.info(f"Step class: { target_class}")
@@ -61,7 +63,7 @@ class Pipeline(PipelineComponent):
                 step_instance.set_config(config=config)
                 result = step_instance.fit_transform(result, config)
                 self.logger.info(f"Step {step.name} completed successfully")
-                self.logger.info(f"Result shape after step {step.name}: {result.shape}")
+                self.logger.info(f"Result shape after step {step.name}: {result.shape if isinstance(result, pd.DataFrame) else result}")
             except Exception as e:
                 self.logger.error(f"Error in step {step.name}: {str(e)}")
                 raise

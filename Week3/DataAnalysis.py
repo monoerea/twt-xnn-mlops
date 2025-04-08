@@ -4,8 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Union, List, Optional
+from Week3.base import PipelineStep
 
-class CorrelationHeatmap:
+class CorrelationHeatmap(PipelineStep):
     """
     A class to create correlation heatmaps with various methods and column selection options.
     
@@ -24,9 +25,9 @@ class CorrelationHeatmap:
     title : str, optional
         Title for the plot (default: 'Correlation Heatmap')
     """
-    
-    def __init__(self, cmap: str = 'coolwarm', figsize: tuple = (10, 8), annot: bool = True, fmt: str = '.2f', title: str = 'Correlation Heatmap'):
-        
+
+    def __init__(self, name = None, cmap: str = 'coolwarm', figsize: tuple = (10, 8), annot: bool = True, fmt: str = '.2f', title: str = 'Correlation Heatmap'):
+        super().__init__(name or self.__class__.__name__)
         self.data = None
         self.cmap = cmap
         self.figsize = figsize
@@ -37,10 +38,11 @@ class CorrelationHeatmap:
         self.data = data
         strategy = config.get('strategy','pearson')
         cols = config.get('cols',data.columns.to_list())
-        strategy_method = getattr(self, )
+        strategy_method = getattr(self, strategy)
         result = strategy_method(cols = cols)
-        result.plt_show()
-        result.savefig(fname=f'Week3/report/{strategy}.csv', transparent='True')
+        result.show()
+        result.savefig(fname=f'Week3/analysis/report/{strategy}.png', transparent='True')
+        return data
     def _select_columns(self, cols: Union[str, List[str], slice, None] = None) -> pd.DataFrame:
         if cols is None:
             return self.data
@@ -86,16 +88,15 @@ class CorrelationHeatmap:
         ax.set_title(self.title)
         plt.tight_layout()
         return fig
-    
-    def plot_custom(self, method: str = 'pearson', 
-                   cols: Union[str, List[str], slice, None] = None,
+
+    def plot_custom(self, method: str = 'pearson', cols: Union[str, List[str], slice, None] = None,
                    **kwargs) -> plt.Figure:
         selected_data = self._select_columns(cols)
         corr = selected_data.corr(method=method)
         return self._plot_heatmap(corr, **kwargs)
 
 if __name__ == '__main__':
-    df = pd.read_csv('data/processed/cleaned_data.csv')
+    df = pd.read_csv('Week3/analysis/cleaned_data.csv')
     heatmap = CorrelationHeatmap(df, title='Feature Correlations')
 
     # Different ways to select columns and methods:

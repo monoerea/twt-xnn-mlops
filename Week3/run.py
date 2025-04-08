@@ -98,6 +98,10 @@ def data_analysis(df):
                         },
                     },
                 },
+            {
+                'CorrelationHeatmap':{
+                    'strategy':'pearson',
+                    }}
         ]
     )
     df = pipeline.fit_transform(df)
