@@ -1,11 +1,16 @@
+from concurrent.futures import ThreadPoolExecutor
 import os
+import re
 import pandas as pd
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Any, Dict, Union, List, Optional
 from Pipeline.base import Analysis
+
+import threading
+import matplotlib
+matplotlib.use('Agg')  # Set before importing pyplot
+import matplotlib.pyplot as plt
+from concurrent.futures import ThreadPoolExecutor
 class DataProfiler(Analysis):
     """Basic data profiling and analysis"""
     def __init__(self, name = None):
@@ -19,18 +24,25 @@ class DataProfiler(Analysis):
             os.makedirs(output_dir, exist_ok=True)
 
         stats = self._basic_stats(data)
+        strategy = config.get('strategy','analyze_correlations')
         self._save_stats_report(stats, output_dir)
 
-        if config.get('strategy','analyze_correlations'):
+        if strategy == 'analyze_correlations':
             corr = self._analyze_correlations(data)
             self._save_correlation_report(corr, output_dir)
 
-        if config.get('strategy','analyze_distributions'):
+        elif strategy == 'analyze_distributions':
             self._analyze_distributions(data, output_dir)
 
-        if config.get('strategy','group_by'):
-            self.group_by(data, output_dir)
-
+        elif strategy == 'group_by':
+            group = GroupAnalysis()
+            group.fit_transform(data, config=config)
+        elif strategy  == 'one_sample':
+            one_sample = TTestAnalysis()
+            result = one_sample.transform(data, config)
+            result.to_csv(f"{output_dir}/one_sample.csv")
+        else:
+            print(f'The{strategy} is not registered.')
         return data
 
     def _basic_stats(self, df: pd.DataFrame) -> Dict[str, Any]:
@@ -133,53 +145,7 @@ class DataProfiler(Analysis):
             plt.tight_layout()
             plt.savefig(plot_path)
             plt.close()
-    def group_by(self, df: pd.DataFrame, output_dir: str):
-        """Generate bar plots showing grouped aggregations of features.
-        
-        Args:
-            df: Input DataFrame
-            output_dir: Directory to save output plots
-        """
-        import re
-        
-        features = self.config.get('features', df.columns.tolist())
-        
-        # Create output directory structure if it doesn't exist
-        os.makedirs(os.path.join(output_dir, 'group_by'), exist_ok=True)
-        
-        for feat in features:
-            # Sanitize feature name for directory
-            safe_feat = re.sub(r'[<>:"/\\|?*]', '_', str(feat))
-            
-            # Create feature subdirectory
-            feat_dir = os.path.join(output_dir, 'group_by', safe_feat)
-            os.makedirs(feat_dir, exist_ok=True)
-            
-            for col in df.columns:
-                if col == feat:  # Skip grouping by same column
-                    continue
-                    
-                try:
-                    # Sanitize column name for filename
-                    safe_col = re.sub(r'[<>:"/\\|?*]', '_', str(col))
-                    
-                    # Group and aggregate data
-                    grouped = df.groupby(feat)[col].mean()  # Using mean as default aggregation
-                    
-                    # Create and save plot
-                    plt.figure(figsize=(10, 6))
-                    grouped.plot(kind='bar')
-                    plt.title(f'{col} grouped by {feat}')
-                    plt.ylabel(col)
-                    plt.tight_layout()
-                    
-                    filename = f'{safe_feat}_by_{safe_col}.png'
-                    plot_path = os.path.join(feat_dir, filename)
-                    plt.savefig(plot_path)
-                    plt.close()
-                    
-                except Exception as e:
-                    print(f"Error processing {feat} by {col}: {str(e)}")
+        return df
 class CorrelationHeatmap(Analysis):
     """
     A class to create correlation heatmaps with various methods and column selection options.
@@ -270,41 +236,90 @@ class CorrelationHeatmap(Analysis):
         corr = selected_data.corr(method=method)
         return self._plot_heatmap(corr, **kwargs)
 
-class DataTrends(Analysis):
-    """Class that outputs a line chart for the given feature.
 
-    Args:
-        Analysis (PipelineStep)
-    """
-    def __init__(self, name = None):
+
+class GroupAnalysis(Analysis):
+    def __init__(self, name=None):
         super().__init__(name or self.__class__.__name__)
-    def transform(self, data, config = None):
-        feature = config.get('feature', None)
-        if feature not in data.columns:
-            return data
-        
-        return data
+        self.config = {}
+        self._plot_lock = threading.Lock()  # For thread-safe plotting
+
+    def _sanitize_name(self, name: str) -> str:
+        """Create filesystem-safe names"""
+        return re.sub(r'[<>:"/\\|?*]', '_', str(name))
+
+    def _process_single_group(self, df: pd.DataFrame, feat: str, col: str, output_dir: str) -> None:
+        """Process one feature-column combination"""
+        try:
+            grouped = df.groupby(feat)[col].mean()
+
+            with self._plot_lock:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                try:
+                    grouped.plot(kind='bar', ax=ax)
+                    ax.set_title(f'{col} grouped by {feat}')
+                    fig.tight_layout()
+                    safe_feat = self._sanitize_name(feat)
+                    safe_col = self._sanitize_name(col)
+                    os.makedirs(os.path.join(output_dir, safe_feat), exist_ok=True)
+                    fig.savefig(os.path.join(output_dir, safe_feat, f'{safe_feat}_by_{safe_col}.png'))
+                finally:
+                    plt.close(fig)
+        except Exception as e:
+            print(f"Skipping {feat}/{col}: {str(e)}")
+
+    def transform(self, df: pd.DataFrame, config: Any) -> pd.DataFrame:
+        """Main analysis entry point"""
+        self.set_config(config=config)
+        output_dir = self.config.get('output_dir', 'analysis/report/group_by')
+        features = self.config.get('features', df.columns.tolist())
+        from tqdm import tqdm
+
+        try:
+            plt.ioff
+            with ThreadPoolExecutor(max_workers=min(4, os.cpu_count())) as executor:
+                for feat in tqdm(features, desc="Processing groups:"):
+                    futures = [
+                        executor.submit(
+                            self._process_single_group,
+                            df, feat, col,
+                            os.path.join(output_dir, 'group_by')
+                        )
+                        for col in df.columns
+                        if col != feat
+                    ]
+                    # Wait for completion (optional)
+                    _ = [f.result() for f in futures]
+            return df
+        finally:
+            plt.close('all')  # Cleanup all figures
+class TTestAnalysis(Analysis):
+    def transform(self, data: pd.DataFrame, config: Any = None):
+        self.config = config
+        strategy = self.config.get('strategy', 'one_sample')
+        print(strategy)
+        try:
+            if strategy == 'one_sample':
+                return self.one_sample(data=data)
+        except Exception as e:
+            self.logger.error(f"Exception at {e}")
+    def one_sample(self, data: pd.DataFrame):
+        from scipy.stats import ttest_1samp
+        stats = []
+        features = self.config.get('features', data.columns)
+        for feat in features:
+            t_stat, p_value = ttest_1samp(data[feat], data[feat].mean())
+            stats.append({'feature': feat, 'p_value': p_value, 't_stat': t_stat})
+        stats = pd.DataFrame(stats)
+        print(stats)
+        return stats
 if __name__ == '__main__':
     df = pd.read_csv('Pipeline/analysis/cleaned_data.csv')
     heatmap = CorrelationHeatmap(df, title='Feature Correlations')
-
-    # Different ways to select columns and methods:
-    # 1. All columns with Pearson correlation
     fig1 = heatmap.pearson()
 
     patterns = ['created', 'status', 'user']
     cols = [col for col in df.columns if any(pattern in col for pattern in patterns)]
 
     fig2 = heatmap.spearman(cols=cols)
-
-    # # 3. Column range with Kendall correlation
-    # fig3 = heatmap.kendall(cols=slice(200, -1))  # From column B to E
-
-    # # 4. Custom method (same as pearson in this case)
-    # fig4 = heatmap.plot_custom(method='pearson', cols=slice(1, 5))
-
-    # # 5. Single column (will show correlation with itself = 1)
-    # fig5 = heatmap.pearson(cols=1)
-
-    # # Show one of the figures
     plt.show()

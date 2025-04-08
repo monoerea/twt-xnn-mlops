@@ -101,7 +101,7 @@ def data_analysis(df):
                 },
             {
                 'DataProfiler': {
-                    'name': 'analyze_distributions',
+                    'name': 'analyze_correlations',
                     'output_dir':output_dir,
                     'strategy':'analyze_correlations',
                 }
@@ -115,10 +115,17 @@ def data_analysis(df):
             },
             {
                 'DataProfiler': {
-                    'name': 'distributions',
+                    'name': 'group_by',
                     'output_dir':output_dir,
-                    'strategy':'group_py',
+                    'strategy':'group_by',
                     'features':['style']
+                }
+            },
+            {
+                'DataProfiler': {
+                    'name': 'one_sample',
+                    'output_dir':output_dir,
+                    'strategy':'one_sample',
                 }
             },
             {
