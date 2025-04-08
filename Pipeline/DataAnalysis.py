@@ -263,6 +263,7 @@ class GroupAnalysis(Analysis):
                     safe_col = self._sanitize_name(col)
                     os.makedirs(os.path.join(output_dir, safe_feat), exist_ok=True)
                     fig.savefig(os.path.join(output_dir, safe_feat, f'{safe_feat}_by_{safe_col}.png'))
+                    return grouped
                 finally:
                     plt.close(fig)
         except Exception as e:
@@ -289,7 +290,8 @@ class GroupAnalysis(Analysis):
                         if col != feat
                     ]
                     # Wait for completion (optional)
-                    _ = [f.result() for f in futures]
+                    results = pd.DataFrame([f.result() for f in futures])
+                    results.to_csv(f"{output_dir}/group_analysis.csv")
             return df
         finally:
             plt.close('all')  # Cleanup all figures

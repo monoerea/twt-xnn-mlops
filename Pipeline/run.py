@@ -118,7 +118,7 @@ def data_analysis(df):
                     'name': 'group_by',
                     'output_dir':output_dir,
                     'strategy':'group_by',
-                    'features':['style']
+                    'features':df.columns.to_list()
                 }
             },
             {
