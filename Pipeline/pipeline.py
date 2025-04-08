@@ -1,9 +1,9 @@
 from typing import Dict, List, Optional, Type
 
 import pandas as pd
-from Week3.DataAnalysis import CorrelationHeatmap
+from Pipeline.DataAnalysis import DataProfiler, CorrelationHeatmap
 from base import PipelineComponent, PipelineStep, StepConfig
-from Week3.transformers import DataImputer, DataScaler, MissingValueRemover
+from Pipeline.transformers import DataImputer, DataScaler, MissingValueRemover
 
 
 class Pipeline(PipelineComponent):
@@ -37,6 +37,7 @@ class Pipeline(PipelineComponent):
             "DataImputer": DataImputer,
             "DataScaler": DataScaler,
             "CorrelationHeatmap": CorrelationHeatmap,
+            "DataProfiler": DataProfiler,
         }
         target_class = classes.get(class_name)
         self.logger.info(f"Step class: { target_class}")

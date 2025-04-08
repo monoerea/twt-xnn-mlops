@@ -8,8 +8,8 @@ from sklearn.ensemble import RandomForestRegressor
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 from analysis.Pipeline.DataInspector import DataInspector
-from Week3.pipeline import Pipeline
-from Week3.transformers import CategoricalEncoder
+from Pipeline.pipeline import Pipeline
+from Pipeline.transformers import CategoricalEncoder
 
 import pandas as pd
 
@@ -29,7 +29,7 @@ def load_data():
                                 right_on="id",
                                 sort=True,
                                 suffixes=('_beer', '_brewery'))
-    beers_and_breweries.to_csv('Week3/analysis/beers_and_breweries.csv', index=False)
+    beers_and_breweries.to_csv('data/raw/beers_and_breweries.csv', index=False)
     return beers_and_breweries
 
 
@@ -41,7 +41,7 @@ def inspect_data(df):
     )
 
     print("=== DEFAULT REPORT ===")
-    output_dir = 'Week3/analysis/data_inpection'
+    output_dir = 'analysis/report/week_3/data_inspection'
     strategies = [
             ('basic_info', {}),
             ('mcar', {'columns': None, 'pct': 0.05}),
@@ -53,6 +53,7 @@ def inspect_data(df):
 
 def data_analysis(df):
     print(df.head())
+    output_dir = 'analysis/report/week_3'
     object_columns = df.select_dtypes(include=['object']).columns
     print("Object columns:", object_columns)
     estimator = RandomForestRegressor(
@@ -75,7 +76,7 @@ def data_analysis(df):
                         'maximum': 1,
                         'to_iterate': False
                     },
-                }
+            }
             ,
             {
                 'DataImputer': {
@@ -99,17 +100,35 @@ def data_analysis(df):
                     },
                 },
             {
+                'DataProfiler': {
+                    'name': 'analyze_distributions',
+                    'output_dir':output_dir,
+                    'strategy':'analyze_correlations',
+                }
+            },
+            {
+                'DataProfiler': {
+                    'name': 'distributions',
+                    'output_dir':output_dir,
+                    'strategy':'analyze_distributions',
+                }
+            },
+            {
                 'CorrelationHeatmap':{
+                    'name': 'CorrelationHeatmap',
                     'strategy':'pearson',
-                    }}
+                    'output_dir':output_dir
+                    }
+            },
         ]
     )
     df = pipeline.fit_transform(df)
     print(df)
-    df.to_csv('Week3/analysis/processed_data.csv', index=False)
+    df.to_csv('data/processed/week_3_beers_and_breweries.csv', index=False)
 
 def main():
     df = load_data()
+    inspect_data(df=df)
     data_analysis(df)
 
 if __name__ == '__main__':

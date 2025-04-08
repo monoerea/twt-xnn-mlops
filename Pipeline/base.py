@@ -52,3 +52,9 @@ class Preprocess(PipelineStep):
 
     def __init__(self, name: str = None):
         super().__init__(name or self.__class__.__name__)
+class Analysis(PipelineStep):
+    """Base class for all analysis in the pipeline.
+
+    """
+    def __init__(self, name: str = None):
+        super().__init__(name or self.__class__.__name__)
