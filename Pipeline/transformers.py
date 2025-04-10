@@ -88,6 +88,7 @@ class DataImputer(Preprocess):
     def transform(self, data: Any, config: Dict = None) -> Any:
         """Process the data to handle missing values."""
         strategy = config.get('strategy', 'median')
+        cat_cols = data.select_dtypes(include=['object']).columns
         if strategy == "median":
             self.logger.info("Imputing missing values with median")
             data.fillna(data.median(), inplace=True)
@@ -107,7 +108,6 @@ class DataImputer(Preprocess):
             from sklearn.experimental import enable_iterative_imputer
             from sklearn.impute import IterativeImputer
             from sklearn.linear_model import BayesianRidge
-
             estimator = config.get('imputer', BayesianRidge())
             params = config.get('params', {
                 'estimator': estimator,
@@ -123,11 +123,12 @@ class DataImputer(Preprocess):
             imputer = IterativeImputer(**params)
             self.logger.info(f"Imputer params: {params}")
             data = pd.DataFrame(imputer.fit_transform(data), columns=data.columns, index=data.index)
-
             self.logger.info("Imputing missing values with Iterative Imputer")
 
         else:
             raise ValueError(f"Unknown strategy: {self.strategy}")
+        data[cat_cols] = data[cat_cols].astype('object')
+        self.logger.info(f"DATA IMPUTER:Data columns {data.select_dtypes(include=['object']).columns} are not numeric")
         return data
 class DataScaler(Preprocess):
         def __init__(self, name: str = None):
@@ -157,6 +158,7 @@ class DataScaler(Preprocess):
                 result = log_scaler.fit_transform(data)
                 data = pd.DataFrame(result, columns=data.columns, index=data.index)
                 self.logger.info("Log scaling applied")
+            self.logger.info(f"DATA IMPUTER:Data columns {data.select_dtypes(include=['object']).columns} are not numeric")
             return data
 
 class LogScaler(BaseEstimator, TransformerMixin):
@@ -167,7 +169,7 @@ class LogScaler(BaseEstimator, TransformerMixin):
 
     def fit(self, x: pd.DataFrame, y: Optional[pd.Series] = None) -> 'LogScaler':
         x = check_array(x, accept_sparse=False, ensure_2d=False)
-        if np.any(x <= -1):
+        if np.any(x <= -2):
             raise ValueError("Logarithmic scaling requires all values to be positive.")
         self.n_features_in_ = x.shape[1]
         if (hasattr(x, "columns")) and (x.columns is not None):
@@ -178,12 +180,15 @@ class LogScaler(BaseEstimator, TransformerMixin):
 
     def transform(self, x:  pd.DataFrame) -> pd.DataFrame:
         check_is_fitted(self, attributes=['n_features_in_'])
+        cat_features = x.select_dtypes(include=['object']).columns
         if not hasattr(self, 'feature_names_in_'):
             raise ValueError("The fit method must be called before transform.")
-        x = check_array(x, accept_sparse=False, ensure_2d=False)
-        if x.shape[1] != self.n_features_in_:
+        x_array = check_array(x, accept_sparse=False, ensure_2d=False)
+        if x_array.shape[1] != self.n_features_in_:
             raise ValueError(f"Expected {self.n_features_in_} features, got {x.shape[1]}")
-        result = np.log1p(x) / np.log(self.base)
+        result = np.log1p(x_array) / np.log(self.base)
+        result = pd.DataFrame(result, columns=x.columns, index=x.index)
+        result[cat_features] = result[cat_features].astype('object')
         return result
 class CategoricalEncoder(Preprocess):
     """Handle categorical data in the data."""
@@ -193,9 +198,14 @@ class CategoricalEncoder(Preprocess):
 
     def transform(self, data: Any, config: Dict = None) -> Any:
         """Process the data to handle categorical data."""
-        strategy = config.get('strategy', 'ordinal')
+        self.config = config or {}
+        strategy = config.get('strategy', 'target')
         self.logger.info(f"Encoding categorical variables with strategy: {strategy}")
-        if strategy == "ordinal":
+
+        if strategy == "target":
+            data = TargetEncoder(name='TargetEncoder').fit_transform(data, config)
+            self.logger.info("Data in target, with data of", data.head())
+        elif strategy == "ordinal":
             self.logger.info(f"Shape before ordinal encoding: {data.shape}")
             from sklearn.preprocessing import OrdinalEncoder
             ordinal_encoder = OrdinalEncoder()
@@ -218,4 +228,19 @@ class CategoricalEncoder(Preprocess):
             self.logger.info(f"Shape after label encoding: {data.shape}")
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
+        return data
+
+class TargetEncoder(Preprocess):
+    """Handle categorical data in the data."""
+
+    def __init__(self, name: str = None):
+        super().__init__(name or self.__class__.__name__)
+
+    def transform(self, data: Any, config: Dict = None) -> pd.DataFrame:
+        categorical_data = config['columns'] if config.get('target') is not None else data.select_dtypes(include=['object']).columns
+
+        encoded_columns = {}
+        for col in categorical_data:
+            encoded_columns[col] = data[col].astype('category').cat.codes
+        data.update(pd.DataFrame(encoded_columns, index=data.index))
         return data

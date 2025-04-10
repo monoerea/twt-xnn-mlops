@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 from analysis.Pipeline.DataInspector import DataInspector
 from Pipeline.pipeline import Pipeline
-from Pipeline.transformers import CategoricalEncoder
+from Pipeline.transformers import CategoricalEncoder, TargetEncoder
 
 import pandas as pd
 
@@ -54,20 +54,16 @@ def inspect_data(df):
 def data_analysis(df):
     print(df.head())
     output_dir = 'analysis/report/week_3'
-    object_columns = df.select_dtypes(include=['object']).columns
-    print("Object columns:", object_columns)
-    estimator = RandomForestRegressor(
-                                        n_estimators=10,
-                                        max_depth=5,
-                                        random_state=21,
-                                        n_jobs=-1
-                                        )
-    encoder  = CategoricalEncoder()
 
-    df = encoder.fit_transform(df, {'ordinal': object_columns})
-    print(df[object_columns].head())
     pipeline = Pipeline(
         steps=[
+            {
+                'CategoricalEncoder': {
+                        'name': 'categorical_encoder',
+                        'strategy': 'target',
+                        'columns':  df.select_dtypes(include=['object']).columns.to_list(),
+                    },
+            },
             {
                 'MissingValueRemover': {
                         'name': 'missing_value_remover',
@@ -82,7 +78,12 @@ def data_analysis(df):
                 'DataImputer': {
                         'name': 'data_transformer',
                         'strategy': 'iterative',
-                        'estimator': estimator,
+                        'estimator': RandomForestRegressor(
+                                        n_estimators=10,
+                                        max_depth=5,
+                                        random_state=21,
+                                        n_jobs=-1
+                                        ),
                         'params': {
                             'max_iter': 10,
                             'imputation_order': 'ascending',
@@ -122,13 +123,6 @@ def data_analysis(df):
                 }
             },
             {
-                'DataProfiler': {
-                    'name': 'one_sample',
-                    'output_dir':output_dir,
-                    'strategy':'one_sample',
-                }
-            },
-            {
                 'CorrelationHeatmap':{
                     'name': 'CorrelationHeatmap',
                     'strategy':'pearson',
@@ -143,7 +137,7 @@ def data_analysis(df):
 
 def main():
     df = load_data()
-    inspect_data(df=df)
+    #inspect_data(df=df)
     data_analysis(df)
 
 if __name__ == '__main__':

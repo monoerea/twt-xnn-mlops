@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import os
 import re
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from typing import Any, Dict, Union, List, Optional
@@ -32,7 +33,9 @@ class DataProfiler(Analysis):
             self._save_correlation_report(corr, output_dir)
 
         elif strategy == 'analyze_distributions':
-            self._analyze_distributions(data, output_dir)
+            profiler = DataDistribution(name='DataDistribution')
+            profiler.fit_transform(data, config=config)
+            # self._analyze_distributions(data, output_dir)
 
         elif strategy == 'group_by':
             group = GroupAnalysis()
@@ -129,17 +132,19 @@ class DataProfiler(Analysis):
     def _analyze_distributions(self, df: pd.DataFrame, output_dir: str):
         """Generate distribution plots for numeric columns"""
         numeric_cols = df.select_dtypes(include='number').columns
-
+        n = len(df)
+        width = min(20, 20 / max(8, n // 200))
+        height = 4
         for col in numeric_cols:
             plot_path = os.path.join(output_dir, f'distribution_{col}.png')
 
-            plt.figure(figsize=(10, 4))
+            plt.figure(figsize=(width, height))
             plt.subplot(1, 2, 1)
             sns.histplot(df[col].dropna(), kde=True)
             plt.title(f'Distribution of {col}')
 
             plt.subplot(1, 2, 2)
-            sns.boxplot(x=df[col].dropna())
+            sns.boxplot(df[col].dropna())
             plt.title(f'Boxplot of {col}')
 
             plt.tight_layout()
@@ -251,7 +256,7 @@ class GroupAnalysis(Analysis):
     def _process_single_group(self, df: pd.DataFrame, feat: str, col: str, output_dir: str) -> None:
         """Process one feature-column combination"""
         try:
-            grouped = df.groupby(feat)[col].mean()
+            grouped = df.groupby(feat)[col].mean().sort_values(ascending=True)
 
             with self._plot_lock:
                 fig, ax = plt.subplots(figsize=(10, 6))
@@ -325,3 +330,55 @@ if __name__ == '__main__':
 
     fig2 = heatmap.spearman(cols=cols)
     plt.show()
+
+class DataDistribution(Analysis):
+    def __init__(self, name):
+        super().__init__(name or self.__class__.__name__)
+
+    def plot_distributions(self, data, col):
+        """Plot histogram and boxplot for a numeric column"""
+        fig, axs = plt.subplots(1, 2, figsize=(max(6, min(20, 20 / max(8, len(data) // 200))), 5))
+        sns.histplot(data[col].dropna(), kde=True, ax=axs[0]).set_title(f'Distribution of {col}')
+        sns.boxplot(x=data[col].dropna(), ax=axs[1]).set_title(f'Boxplot of {col}')
+        return fig
+
+    def plot_grouped_box(self, data, num_col, cat_col):
+        """Plot a boxplot grouped by a categorical column using adaptive category limit."""
+        n_unique = data[cat_col].nunique()
+        max_categories = int(np.sqrt(n_unique)) if n_unique > 0 else 0
+
+        if max_categories < 2:
+            self.logger.info(f"Skipping {cat_col} (too few unique categories).")
+            return None
+
+        top_cats = data[cat_col].value_counts().nlargest(max_categories).index
+        filtered = data[data[cat_col].isin(top_cats)]
+
+        order = filtered.groupby(cat_col)[num_col].mean().sort_values().index
+        fig, ax = plt.subplots(figsize=(max(6, min(20, 20 / max(8, len(filtered) // 200))), 10))
+        sns.boxplot(x=cat_col, y=num_col, data=filtered, ax=ax, order=order)
+        ax.set_title(f'{num_col} by {cat_col}')
+        ax.tick_params(axis='x', rotation=45)
+        return fig
+
+
+    def save_plot(self, fig, name, folder):
+        pathfile = os.path.join(self.config.get('output_dir', 'analysis/week_3'), folder)
+        """Save figure to output directory"""
+        os.makedirs(pathfile, exist_ok=True)
+        fig.tight_layout()
+        fig.savefig(os.path.join(pathfile, f"{name}.png"))
+        plt.close(fig)
+
+    def transform(self, data: pd.DataFrame, config: Any = None) -> pd.DataFrame:
+        """Generate all distribution plots"""
+        self.config = config or {}
+        num_cols = data.select_dtypes(include='number').columns
+        cat_cols = data.select_dtypes(include=['object', 'category']).columns
+        self.logger.info(f"Categorical columns: {cat_cols}")
+        for col in num_cols:
+            self.save_plot(self.plot_distributions(data, col), f'distribution_{col}', 'dist')
+            for cat in cat_cols:
+                if fig := self.plot_grouped_box(data, col, cat):
+                    self.save_plot(fig, f'{col}_by_{cat}', folder='grouped_box')
+        return data
