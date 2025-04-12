@@ -7,7 +7,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import IterativeImputer, KNNImputer, SimpleImputer
 from sklearn.linear_model import BayesianRidge
 from sklearn.preprocessing import OrdinalEncoder
-from analysis.Pipeline.Pipeline import PipelineStep
+from Pipeline import PipelineStep
 
 class Cleaner(PipelineStep):
     """Basic data cleaning operations"""

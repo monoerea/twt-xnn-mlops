@@ -13,7 +13,7 @@ from Pipeline.transformers import CategoricalEncoder, TargetEncoder
 
 import pandas as pd
 
-def load_data():
+def load_data_breweries():
 
     beers_url = "https://raw.githubusercontent.com/nickhould/craft-beers-dataset/master/data/processed/beers.csv"
     breweries_url = "https://raw.githubusercontent.com/nickhould/craft-beers-dataset/master/data/processed/breweries.csv"
@@ -29,19 +29,32 @@ def load_data():
                                 right_on="id",
                                 sort=True,
                                 suffixes=('_beer', '_brewery'))
+    print(beers_and_breweries.columns)
+    beers_and_breweries.drop(columns=['Unnamed: 0_brewery','Unnamed: 0_beer', 'id_brewery'] , inplace=True, axis=1)
     beers_and_breweries.to_csv('data/raw/beers_and_breweries.csv', index=False)
     return beers_and_breweries
 
-
-def inspect_data(df):
+def load_data_twitter():
+    data = pd.read_csv("data/processed/flattened_status.csv", low_memory=False)
+    data = pd.DataFrame(data).drop_duplicates()
+    # remove_patterns = ['id','text','media','screen_name','mentions','description']
+    # pattern = re.compile('|'.join(remove_patterns), flags=re.IGNORECASE)
+    # # Get columns to remove
+    # to_remove = [col for col in data.columns if pattern.search(col)]
+    # data = data[data.columns.difference(to_remove)]
+    # print(data[data.columns[data.columns.str.contains('created_at', case=False, na=False)].tolist()].dtypes)
+    return data
+def inspect_data(df, output_dir='analysis/report/week_4/data_inspection'):
+    remove_patterns = ['id','text','media','screen_name','mentions','description']
+    pattern = re.compile('|'.join(remove_patterns), flags=re.IGNORECASE)
+    to_skip = [col for col in df.columns if pattern.search(col)]
     inspector = DataInspector(
         df=df,
         thresholds=[0.0, 0.99],
-        exclude_columns=['id', 'brewery_id'],
+        exclude_columns=to_skip,
     )
 
     print("=== DEFAULT REPORT ===")
-    output_dir = 'analysis/report/week_3/data_inspection'
     strategies = [
             ('basic_info', {}),
             ('mcar', {'columns': None, 'pct': 0.05}),
@@ -134,11 +147,21 @@ def data_analysis(df):
     df = pipeline.fit_transform(df)
     print(df)
     df.to_csv('data/processed/week_3_beers_and_breweries.csv', index=False)
-
+def data_analysis_twitter(df):
+    pipeline = Pipeline(steps=[
+        {'MissingValueRemover': {
+                'name':'missing_value_remover',
+                'strategy':'remove_missing',
+                'minimum': 0.75,
+                'maximum': .95,
+                'to_iterate': False}
+         },])
+    df = pipeline.fit_transform(df)
+    print(df.head())
 def main():
-    df = load_data()
-    #inspect_data(df=df)
-    data_analysis(df)
+    df = load_data_twitter()
+    inspect_data(df=df, output_dir='analysis/report/week_4/data_inspection')
+    data_analysis_twitter(df)
 
 if __name__ == '__main__':
     main()

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 from typing import Dict, Any
-from analysis.Pipeline.Pipeline import PipelineStep
+from Pipeline import PipelineStep
 
 class DataProfiler(PipelineStep):
     """Basic data profiling and analysis"""
@@ -89,6 +89,7 @@ class DataProfiler(PipelineStep):
             return {'error': 'Not enough numeric columns for correlation analysis'}
         
         corr_matrix = df[numeric_cols].corr()
+        print(corr_matrix)
         significant = []
         
         for i, col1 in enumerate(numeric_cols):

@@ -1,3 +1,9 @@
+import os
+import re
+import sys
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
+
 import re
 import pandas as pd
 import numpy as np
@@ -85,20 +91,20 @@ def main():
             'categorical_columns': data.select_dtypes(include=['object','bool']).columns,
             'encoding_method': 'numerical'
         },
-        'Imputer': {
-            'strategy': 'iterative',  # Options: 'simple', 'knn', 'iterative',
-            'numeric_cols': numeric_cols,
-            'max_iter': 15,
-            'random_state':21,
-            'estimator': RandomForestRegressor(
-                        n_estimators=10,
-                        max_samples=0.5,
-                        max_features=0.8,
-                        min_samples_leaf=10,
-                        n_jobs=-1,
-                        random_state=21
-                        )
-        },
+        # 'Imputer': {
+        #     'strategy': 'iterative',  # Options: 'simple', 'knn', 'iterative',
+        #     'numeric_cols': numeric_cols,
+        #     'max_iter': 15,
+        #     'random_state':21,
+        #     'estimator': RandomForestRegressor(
+        #                 n_estimators=10,
+        #                 max_samples=0.5,
+        #                 max_features=0.8,
+        #                 min_samples_leaf=10,
+        #                 n_jobs=-1,
+        #                 random_state=21
+        #                 )
+        # },
         'DataProfiler': {
             'output_dir': 'analysis/report/graphs',
             'analyze_correlations': True,
@@ -112,7 +118,7 @@ def main():
     has_null = processed_data.isna().mean()==0
     print(has_null)
     if all(has_null):
-        processed_data.to_csv('data/processed/cleaned_data.csv', index=False)
+        processed_data.to_csv('data/processed/_cleaned_data.csv', index=False)
     else:
         print("Has null values.")
 if __name__ == "__main__":

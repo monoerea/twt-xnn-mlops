@@ -16,6 +16,8 @@ class MissingValueRemover(Preprocess):
         """Get the ratio of missing values in each row and column."""
         rows_null_ratio = data.isnull().mean(axis=1)
         col_null_ratio = data.isnull().mean(axis=0)
+        self.logger.info(f"Row null ratios: {rows_null_ratio}")
+        self.logger.info(f"Column null ratios: {col_null_ratio}")
         return rows_null_ratio, col_null_ratio
 
     def _get_null_candidates_(self, null_ratio: pd.Series, minimum: float = 0.5, maximum: float = 0.95, top_n: Optional[int] = None) -> pd.Series:
@@ -180,12 +182,10 @@ class LogScaler(BaseEstimator, TransformerMixin):
 
     def transform(self, x:  pd.DataFrame) -> pd.DataFrame:
         check_is_fitted(self, attributes=['n_features_in_'])
-        cat_features = x.select_dtypes(include=['object']).columns
+        cat_features = x.select_dtypes(include=['object','category']).columns
         if not hasattr(self, 'feature_names_in_'):
             raise ValueError("The fit method must be called before transform.")
-        x_array = check_array(x, accept_sparse=False, ensure_2d=False)
-        if x_array.shape[1] != self.n_features_in_:
-            raise ValueError(f"Expected {self.n_features_in_} features, got {x.shape[1]}")
+        x_array = check_array(x[x.columns.difference(cat_features)], accept_sparse=False, ensure_2d=False)
         result = np.log1p(x_array) / np.log(self.base)
         result = pd.DataFrame(result, columns=x.columns, index=x.index)
         result[cat_features] = result[cat_features].astype('object')

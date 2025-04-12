@@ -320,17 +320,6 @@ class TTestAnalysis(Analysis):
         stats = pd.DataFrame(stats)
         print(stats)
         return stats
-if __name__ == '__main__':
-    df = pd.read_csv('Pipeline/analysis/cleaned_data.csv')
-    heatmap = CorrelationHeatmap(df, title='Feature Correlations')
-    fig1 = heatmap.pearson()
-
-    patterns = ['created', 'status', 'user']
-    cols = [col for col in df.columns if any(pattern in col for pattern in patterns)]
-
-    fig2 = heatmap.spearman(cols=cols)
-    plt.show()
-
 class DataDistribution(Analysis):
     def __init__(self, name):
         super().__init__(name or self.__class__.__name__)
@@ -360,7 +349,35 @@ class DataDistribution(Analysis):
         ax.set_title(f'{num_col} by {cat_col}')
         ax.tick_params(axis='x', rotation=45)
         return fig
+    def plot_categorical_frequency(self, data, cat_col, logger=None, figsize=(10, 6)):
+        n_unique = data[cat_col].nunique()
+        max_categories = int(np.sqrt(n_unique)) if n_unique > 0 else 0
 
+        if max_categories < 2:
+            msg = f"Skipping {cat_col} (too few unique categories: {n_unique})"
+            if logger:
+                logger.info(msg)
+            else:
+                print(msg)
+            return None
+
+        top_cats = data[cat_col].value_counts().nlargest(max_categories).index
+        filtered = data[data[cat_col].isin(top_cats)]
+
+        plt.figure(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.countplot(x=cat_col, data=filtered, order=top_cats, ax=ax)
+
+        ax.set_title(f"Top {max_categories} Categories in '{cat_col}' (of {n_unique} total)")
+        ax.tick_params(axis='x', rotation=45)
+
+        total = len(filtered)
+        for p in ax.patches:
+            height = p.get_height()
+            ax.text(p.get_x() + p.get_width()/2., height + 0.5,
+                    f'{height/total:.1%}',
+                    ha="center")
+        return fig
 
     def save_plot(self, fig, name, folder):
         pathfile = os.path.join(self.config.get('output_dir', 'analysis/week_3'), folder)
@@ -379,6 +396,8 @@ class DataDistribution(Analysis):
         for col in num_cols:
             self.save_plot(self.plot_distributions(data, col), f'distribution_{col}', 'dist')
             for cat in cat_cols:
+                if freq_fig := self.plot_categorical_frequency(data, cat):
+                    self.save_plot(freq_fig, f'frequency_of_{cat}', folder='frequency')
                 if fig := self.plot_grouped_box(data, col, cat):
                     self.save_plot(fig, f'{col}_by_{cat}', folder='grouped_box')
         return data
