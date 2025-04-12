@@ -8,78 +8,95 @@ from sklearn.utils.validation import check_array, check_is_fitted
 from numpy.typing import ArrayLike
 
 class MissingValueRemover(Preprocess):
-    """Handle missing values in the data."""
+    """Missing value handler with separate row/column thresholds and batch processing."""
 
     def __init__(self, name: str = None):
         super().__init__(name or self.__class__.__name__)
-    def _get_missing_ratios_(self, data: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
-        """Get the ratio of missing values in each row and column."""
-        rows_null_ratio = data.isnull().mean(axis=1)
-        col_null_ratio = data.isnull().mean(axis=0)
-        self.logger.info(f"Row null ratios: {rows_null_ratio}")
-        self.logger.info(f"Column null ratios: {col_null_ratio}")
-        return rows_null_ratio, col_null_ratio
+        self._null_matrix_cache = None
 
-    def _get_null_candidates_(self, null_ratio: pd.Series, minimum: float = 0.5, maximum: float = 0.95, top_n: Optional[int] = None) -> pd.Series:
-        """Get candidates for dropping based on null ratios."""
-        candidates = null_ratio[(null_ratio > maximum) & (null_ratio < minimum)]
-        self.logger.info(f"Candidates for dropping: {candidates}")
-        if candidates.empty:
-            return candidates
-        if top_n is None:
-            top_n = min(len(candidates), int(np.sqrt(len(null_ratio))))
-        candidates = candidates.nlargest(top_n)
-        self.logger.info(f"Candidates for dropping: {candidates}")
-        return candidates
+    def _get_missing_ratios(self, data: pd.DataFrame) -> Tuple[pd.Series, pd.Series]:
+        """Get cached null ratios with shape validation."""
+        if self._null_matrix_cache is None or self._null_matrix_cache.shape != data.shape:
+            self._null_matrix_cache = data.isnull()
+        return self._null_matrix_cache.mean(axis=1), self._null_matrix_cache.mean(axis=0)
 
-    def _drop_worst_(self, data: pd.DataFrame, col_candidates: pd.Series, row_candidates: pd.Series) -> pd.DataFrame:
-        """Drop the worst candidate based on null ratios."""
-        if not col_candidates.empty and col_candidates.max() > row_candidates.max() if not row_candidates.empty else True:
-            worst_col = col_candidates.idxmax()
-            data.drop(columns=worst_col, inplace=True)
-            self.logger.info(f"Dropping column: {worst_col}")
-        elif not row_candidates.empty:
-            worst_col = row_candidates.idxmax()
-            self.logger.info(f"Dropping row: {worst_col}")
-            data.drop(index=worst_col, inplace=True)
-        return data
-    def _removed_missing_(self, data: pd.DataFrame, minimum: float = 0.5, maximum: float = 0.95) -> pd.DataFrame:
-        """Remove columns with missing values based on a threshold."""
-        rows_null_ratio, col_null_ratio = self._get_missing_ratios_(data)
+    def _get_threshold_violators(self, 
+                               null_ratio: pd.Series, 
+                               threshold: float,
+                               batch_count: int) -> pd.Series:
+        """Get top N violators sorted by severity."""
+        violators = null_ratio[null_ratio > threshold].sort_values(ascending=False)
+        return violators.head(batch_count)
 
-        col_candidates = self._get_null_candidates_(col_null_ratio, minimum, maximum)
-        row_candidates = self._get_null_candidates_(rows_null_ratio, minimum, maximum)
+    def _log_violators(self, violators: pd.Series, item_type: str):
+        """Log detailed information about violators."""
+        if not violators.empty:
+            self.logger.info(
+                f"Top {len(violators)} {item_type} violators:\n"
+                f"Max: {violators.max():.2f}\n"
+                f"Min: {violators.min():.2f}\n"
+                f"Mean: {violators.mean():.2f}"
+            )
 
-        return col_candidates, row_candidates
-
-    def _removed_missing_balanced_(self, data: pd.DataFrame, minimum: float = 0.5, maximum: float = 0.95, to_iterate: bool = False) -> pd.DataFrame:
-        """Remove columns with missing values based on a threshold."""
+    def transform(self, data: pd.DataFrame, config: Dict = None) -> pd.DataFrame:
+        """
+        Transform data with configurable thresholds and batch counts.
+        
+        Config Options:
+        - row_threshold: float (default 0.95)
+        - col_threshold: float (default 0.90) 
+        - row_batch_count: int (default 10)
+        - col_batch_count: int (default 5)
+        - max_iterations: int (default 20)
+        """
+        config = config or {}
+        row_thresh = config.get('row_threshold', 0.95)
+        col_thresh = config.get('col_threshold', 0.90)
+        row_batch = config.get('row_batch_count', 10)
+        col_batch = config.get('col_batch_count', 5)
+        max_iter = config.get('max_iterations', 20)
+        
         df = data.copy()
-        while True:
-            col_candidates, row_candidates = self._removed_missing_(df, minimum, maximum)
-            self.logger.info(f"Row null ratios: {row_candidates}")
-            self.logger.info(f"Column null ratios: {col_candidates}")
-            if col_candidates.empty and row_candidates.empty:
-                break
-            df = self._drop_worst_(df, col_candidates, row_candidates=row_candidates)
-            if to_iterate == False:
-                break
-        if df.shape[0] == 0:
-            raise ValueError("All rows have been dropped. Please check your data.")
-        self.logger.info(f"Final shape after removing missing values: {df.shape}")
-        return df
+        self.logger.info(
+            f"Initial shape: {df.shape}\n"
+            f"Row threshold: >{row_thresh}, batch: {row_batch}\n"
+            f"Column threshold: >{col_thresh}, batch: {col_batch}"
+        )
 
-    def transform(self, data: Any, config: Dict = None) -> Any:
-        """Process the data to handle missing values."""
-        strategy = config.get('strategy', 'remove_missing')
-        if strategy == "remove_missing":
-            minimum, maximum = config.get('threshold', (0.5, 0.95))
-            to_iterate = config.get('to_iterate', False)
-            self.logger.info(f"Shape before removing missing values: {data.shape}")
-            df = self._removed_missing_balanced_(data, minimum, maximum, to_iterate)
-            return df
-        else:
-            raise ValueError(f"Unknown strategy: {self.strategy}")
+        for iteration in range(1, max_iter + 1):
+            row_ratios, col_ratios = self._get_missing_ratios(df)
+            row_violators = self._get_threshold_violators(row_ratios, row_thresh, row_batch)
+            col_violators = self._get_threshold_violators(col_ratios, col_thresh, col_batch)
+
+            self._log_violators(row_violators, "row")
+            self._log_violators(col_violators, "column")
+
+            if row_violators.empty and col_violators.empty:
+                self.logger.info(f"Clean data achieved at iteration {iteration}")
+                break
+
+            # Prioritize rows first
+            if not row_violators.empty:
+                df = df.drop(index=row_violators.index)
+                self.logger.info(f"Iteration {iteration}: Dropped {len(row_violators)} rows")
+            elif not col_violators.empty:
+                df = df.drop(columns=col_violators.index)
+                self.logger.info(f"Iteration {iteration}: Dropped {len(col_violators)} columns")
+
+            self._null_matrix_cache = None  # Invalidate cache
+
+        # Final validation report
+        final_rows, final_cols = self._get_missing_ratios(df)
+        remaining_row_violations = final_rows[final_rows > row_thresh].count()
+        remaining_col_violations = final_cols[final_cols > col_thresh].count()
+        
+        self.logger.info(
+            f"Final shape: {df.shape}\n"
+            f"Remaining row violations: {remaining_row_violations}\n"
+            f"Remaining column violations: {remaining_col_violations}"
+        )
+        
+        return df
 
 class DataImputer(Preprocess):
     """Handle missing values in the data."""
