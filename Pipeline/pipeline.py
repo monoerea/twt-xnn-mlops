@@ -59,7 +59,7 @@ class Pipeline(PipelineComponent):
             try:
                 self.logger.info(f"Running step: {step.name}")
                 config = step.params
-                self.logger.info(f"Step {step.name} params: {config['strategy']}")
+                self.logger.info(f"Step {step.name} params: {config['strategy'] if 'strategy' in config else config}")
                 step_instance = self._get_step_class(step.step)(name=step.name)
                 self.logger.info(f"Step {step_instance} instance created")
                 step_instance.set_config(config=config)

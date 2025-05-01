@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 from analysis.Pipeline.DataInspector import DataInspector
 from Pipeline.pipeline import Pipeline
-from Pipeline.transformers import CategoricalEncoder, TargetEncoder
+from Pipeline.transformers import CategoricalEncoder, MissingValueRemover, TargetEncoder
 
 import pandas as pd
 
@@ -37,12 +37,12 @@ def load_data_breweries():
 def load_data_twitter():
     data = pd.read_csv("data/processed/flattened_status.csv", low_memory=False)
     data = pd.DataFrame(data).drop_duplicates()
-    # remove_patterns = ['id','text','media','screen_name','mentions','description']
-    # pattern = re.compile('|'.join(remove_patterns), flags=re.IGNORECASE)
-    # # Get columns to remove
-    # to_remove = [col for col in data.columns if pattern.search(col)]
-    # data = data[data.columns.difference(to_remove)]
-    # print(data[data.columns[data.columns.str.contains('created_at', case=False, na=False)].tolist()].dtypes)
+    remove_patterns = ['str','text','media','screen_name','mentions','description']
+    pattern = re.compile('|'.join(remove_patterns), flags=re.IGNORECASE)
+    # Get columns to remove
+    to_remove = [col for col in data.columns if pattern.search(col)]
+    data = data[data.columns.difference(to_remove)]
+    print(data[data.columns[data.columns.str.contains('created_at', case=False, na=False)].tolist()].dtypes)
     return data
 def inspect_data(df, output_dir='analysis/report/week_4/data_inspection'):
     remove_patterns = ['id','text','media','screen_name','mentions','description']
@@ -148,19 +148,32 @@ def data_analysis(df):
     print(df)
     df.to_csv('data/processed/week_3_beers_and_breweries.csv', index=False)
 def data_analysis_twitter(df):
+    output_dir = 'analysis/report/week_4/initial_clean'
     pipeline = Pipeline(steps=[
         {'MissingValueRemover': {
                 'name':'missing_value_remover',
-                'strategy':'remove_missing',
-                'minimum': 0.75,
-                'maximum': .95,
-                'to_iterate': False}
-         },])
+                'row_threshold': .95,
+                'col_threshold': .999,
+                'row_batch_count': 100,
+                'col_batch_count': 5,
+                'max_iterations': 1000,
+                'to_iterate': True}
+        },
+        {'DataProfiler': {
+                'name':'analyze_distributions',
+                'output_dir': output_dir,
+                'strategy':'analyze_distributions',
+                'batch_size':1,
+                'id_columns': ['id'],
+                'sample_size': 1000,
+                }
+        },
+        ])
     df = pipeline.fit_transform(df)
     print(df.head())
 def main():
     df = load_data_twitter()
-    inspect_data(df=df, output_dir='analysis/report/week_4/data_inspection')
+    #inspect_data(df=df, output_dir='analysis/report/week_4/data_inspection')
     data_analysis_twitter(df)
 
 if __name__ == '__main__':

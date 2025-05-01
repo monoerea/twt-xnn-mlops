@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from typing import Any, Dict, Union, List, Optional
+
+from tqdm import tqdm
 from Pipeline.base import Analysis
 
 import threading
@@ -320,84 +322,238 @@ class TTestAnalysis(Analysis):
         stats = pd.DataFrame(stats)
         print(stats)
         return stats
+import os
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas as pd
+from tqdm.auto import tqdm
+from typing import Any, Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor
+
 class DataDistribution(Analysis):
-    def __init__(self, name):
+    def __init__(self, name: str = None):
         super().__init__(name or self.__class__.__name__)
+        self._current_batch = 0
+        self._plot_cache = []
+        self._configure_plot_style()
 
-    def plot_distributions(self, data, col):
-        """Plot histogram and boxplot for a numeric column"""
-        fig, axs = plt.subplots(1, 2, figsize=(max(6, min(20, 20 / max(8, len(data) // 200))), 5))
-        sns.histplot(data[col].dropna(), kde=True, ax=axs[0]).set_title(f'Distribution of {col}')
-        sns.boxplot(x=data[col].dropna(), ax=axs[1]).set_title(f'Boxplot of {col}')
-        return fig
+    def _configure_plot_style(self):
+        """Set consistent style for all plots"""
+        plt.rcParams.update({
+            'figure.dpi': 120,
+            'savefig.dpi': 300,
+            'figure.autolayout': True
+        })
 
-    def plot_grouped_box(self, data, num_col, cat_col):
-        """Plot a boxplot grouped by a categorical column using adaptive category limit."""
-        n_unique = data[cat_col].nunique()
-        max_categories = int(np.sqrt(n_unique)) if n_unique > 0 else 0
+    def plot_distributions(self, data: pd.DataFrame, col: str) -> Optional[plt.Figure]:
+        """Plot histogram and boxplot with adaptive sizing"""
+        try:
+            fig, axs = plt.subplots(1, 2, figsize=(self._get_fig_size(len(data)), 5))
+            sns.histplot(data[col].dropna(), kde=True, ax=axs[0])
+            axs[0].set_title(f'Distribution of {col}')
 
-        if max_categories < 2:
-            self.logger.info(f"Skipping {cat_col} (too few unique categories).")
+            sns.boxplot(x=data[col].dropna(), ax=axs[1])
+            axs[1].set_title(f'Boxplot of {col}')
+
+            return fig
+        except Exception as e:
+            self.logger.error(f"Failed plotting {col}: {str(e)}")
             return None
 
-        top_cats = data[cat_col].value_counts().nlargest(max_categories).index
-        filtered = data[data[cat_col].isin(top_cats)]
+    def plot_grouped_box(self, data: pd.DataFrame, num_col: str, cat_col: str) -> Optional[plt.Figure]:
+        """Batch-friendly grouped boxplot with smart category limiting"""
+        try:
+            n_unique = data[cat_col].nunique()
+            if n_unique < 2:
+                return None
 
-        order = filtered.groupby(cat_col)[num_col].mean().sort_values().index
-        fig, ax = plt.subplots(figsize=(max(6, min(20, 20 / max(8, len(filtered) // 200))), 10))
-        sns.boxplot(x=cat_col, y=num_col, data=filtered, ax=ax, order=order)
-        ax.set_title(f'{num_col} by {cat_col}')
-        ax.tick_params(axis='x', rotation=45)
-        return fig
-    def plot_categorical_frequency(self, data, cat_col, logger=None, figsize=(10, 6)):
-        n_unique = data[cat_col].nunique()
-        max_categories = int(np.sqrt(n_unique)) if n_unique > 0 else 0
+            max_cats = min(15, int(np.sqrt(n_unique))) if n_unique > 15 else n_unique
+            top_cats = data[cat_col].value_counts().nlargest(max_cats).index
+            filtered = data[data[cat_col].isin(top_cats)]
+            fig, ax = plt.subplots(figsize=(self._get_fig_size(len(filtered)), 8))
+            order = filtered.groupby(cat_col)[num_col].median().sort_values().index
+            sns.boxplot(x=cat_col, y=num_col, data=filtered,
+                       ax=ax, order=order, 
+                       flierprops={'marker': 'x', 'markersize': 3})
+            ax.set_title(f'{num_col[:15]} by {cat_col[:15]}')
+            ax.tick_params(axis='x', rotation=45)
+            return fig
+        except Exception as e:
+            self.logger.error(f"Failed grouped boxplot {num_col}x{cat_col}: {str(e)}")
+            return None
 
-        if max_categories < 2:
-            msg = f"Skipping {cat_col} (too few unique categories: {n_unique})"
-            if logger:
-                logger.info(msg)
+    def plot_categorical_frequency(self, data: pd.DataFrame, cat_col: str) -> Optional[plt.Figure]:
+        """Optimized categorical frequency plot"""
+        try:
+            n_unique = data[cat_col].nunique()
+            if n_unique < 2:
+                return None
+
+            max_cats = min(20, int(np.sqrt(n_unique)))
+            top_cats = data[cat_col].value_counts().nlargest(max_cats).index
+            filtered = data[data[cat_col].isin(top_cats)]
+
+            fig, ax = plt.subplots(figsize=(12, 6))
+            sns.countplot(x=cat_col, data=filtered, order=top_cats, ax=ax)
+            
+            ax.set_title(f"Top {max_cats} of {n_unique} {cat_col[:20]} Categories")
+            ax.tick_params(axis='x', rotation=45)
+            
+            # Add percentage annotations only for small categories
+            if max_cats <= 10:
+                total = len(filtered)
+                for p in ax.patches:
+                    ax.annotate(f'{p.get_height()/total:.1%}', 
+                              (p.get_x() + p.get_width()/2., p.get_height()),
+                              ha='center', va='center', xytext=(0, 5),
+                              textcoords='offset points')
+            return fig
+        except Exception as e:
+            self.logger.error(f"Failed frequency plot {cat_col}: {str(e)}")
+            return None
+
+    def _get_fig_size(self, sample_size: int) -> int:
+        """Dynamic figure sizing based on data volume"""
+        return max(6, min(20, 20 / (8 + sample_size // 1000)))
+
+    def _process_batch(self, data: pd.DataFrame, num_cols: List[str], cat_cols: List[str], 
+                     batch_num: int, batch_size: int, main_pbar: tqdm = None) -> None:
+        """Process a single batch of columns with progress tracking"""
+        start_idx = batch_num * batch_size
+        end_idx = start_idx + batch_size
+        current_num_cols = num_cols[start_idx:end_idx]
+
+        for num_col in current_num_cols:
+            # Distribution plots
+            if fig := self.plot_distributions(data, num_col):
+                self._plot_cache.append(('dist', f'distribution_{num_col}', fig))
+                if main_pbar:
+                    main_pbar.update(1)
+            
+            # Categorical plots
+            for cat_col in cat_cols:
+                if freq_fig := self.plot_categorical_frequency(data, cat_col):
+                    self._plot_cache.append(('frequency', f'frequency_{cat_col}', freq_fig))
+                if box_fig := self.plot_grouped_box(data, num_col, cat_col):
+                    self._plot_cache.append(('grouped_box', f'{num_col}_by_{cat_col}', box_fig))
+                
+                if main_pbar:
+                    main_pbar.update(1)
+                    main_pbar.set_postfix({'Columns': f"{num_col[:15]}... x {cat_col[:15]}..."})
+
+    def _save_all_plots(self):
+        """Save all cached plots in batch"""
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = []
+            for folder, name, fig in self._plot_cache:
+                futures.append(
+                    executor.submit(
+                        self.save_plot, 
+                        fig, 
+                        name, 
+                        folder
+                    )
+                )
+            for future in tqdm(futures, desc="Saving plots"):
+                future.result()
+        self._plot_cache = []
+
+    def _get_optimal_sample(self, data: pd.DataFrame, id_col: str = None, 
+                      sample_size: int = 1000) -> pd.DataFrame:
+        """
+        Get optimal sample with:
+        1. Most complete rows (least nulls)
+        2. Diverse IDs (if id_col provided)
+        3. Representative distribution
+        """
+        if len(data) == 0:
+            return pd.DataFrame()
+
+        # Ensure sample_size is within valid range
+        sample_size = min(sample_size, len(data))
+        if sample_size <= 0:
+            return pd.DataFrame()
+
+        # Score rows by completeness
+        completeness = data.notna().mean(axis=1)
+        
+        try:
+            if id_col and id_col in data.columns:
+                # Get top complete rows per unique ID
+                unique_ids = data[id_col].nunique()
+                sample_per_id = max(1, sample_size // unique_ids)
+                
+                sample = (data
+                        .assign(_completeness=completeness)
+                        .sort_values('_completeness', ascending=False)
+                        .groupby(id_col, group_keys=False)
+                        .apply(lambda x: x.head(sample_per_id))
+                        .nlargest(sample_size, '_completeness')
+                        .drop(columns='_completeness'))
             else:
-                print(msg)
-            return None
+                # Safely get most complete rows
+                valid_sample_size = min(sample_size, len(data))
+                sample_indices = completeness.nlargest(valid_sample_size).index
+                sample = data.loc[sample_indices]
+            
+            # Ensure we maintain original distributions
+            num_cols = data.select_dtypes(include='number').columns
+            if len(num_cols) > 0 and len(sample) > 0:
+                # Stratify by numerical columns' quartiles
+                strat_col = data[num_cols].mean(axis=1).rank(pct=True)
+                n_groups = min(5, len(sample))
+                sample = (data
+                        .loc[sample.index]
+                        .groupby(pd.qcut(strat_col[sample.index], n_groups))
+                        .apply(lambda x: x.sample(min(len(x), max(1, sample_size//n_groups))))
+                        .reset_index(drop=True))
+            
+            return sample.sample(min(len(sample), sample_size)) if len(sample) > 0 else pd.DataFrame()
+        
+        except Exception as e:
+            self.logger.error(f"Error in sampling: {str(e)}")
+            # Fallback to random sample if optimal sampling fails
+            return data.sample(min(len(data), sample_size))
 
-        top_cats = data[cat_col].value_counts().nlargest(max_categories).index
-        filtered = data[data[cat_col].isin(top_cats)]
-
-        plt.figure(figsize=figsize)
-        fig, ax = plt.subplots(figsize=figsize)
-        sns.countplot(x=cat_col, data=filtered, order=top_cats, ax=ax)
-
-        ax.set_title(f"Top {max_categories} Categories in '{cat_col}' (of {n_unique} total)")
-        ax.tick_params(axis='x', rotation=45)
-
-        total = len(filtered)
-        for p in ax.patches:
-            height = p.get_height()
-            ax.text(p.get_x() + p.get_width()/2., height + 0.5,
-                    f'{height/total:.1%}',
-                    ha="center")
-        return fig
-
-    def save_plot(self, fig, name, folder):
-        pathfile = os.path.join(self.config.get('output_dir', 'analysis/week_3'), folder)
-        """Save figure to output directory"""
-        os.makedirs(pathfile, exist_ok=True)
-        fig.tight_layout()
-        fig.savefig(os.path.join(pathfile, f"{name}.png"))
-        plt.close(fig)
-
-    def transform(self, data: pd.DataFrame, config: Any = None) -> pd.DataFrame:
-        """Generate all distribution plots"""
+    def transform(self, data: pd.DataFrame, config: Dict = None) -> pd.DataFrame:
+        """Batch-processed visualization pipeline with smart sampling"""
+        self._configure_plot_style()
         self.config = config or {}
-        num_cols = data.select_dtypes(include='number').columns
-        cat_cols = data.select_dtypes(include=['object', 'category']).columns
-        self.logger.info(f"Categorical columns: {cat_cols}")
-        for col in num_cols:
-            self.save_plot(self.plot_distributions(data, col), f'distribution_{col}', 'dist')
-            for cat in cat_cols:
-                if freq_fig := self.plot_categorical_frequency(data, cat):
-                    self.save_plot(freq_fig, f'frequency_of_{cat}', folder='frequency')
-                if fig := self.plot_grouped_box(data, col, cat):
-                    self.save_plot(fig, f'{col}_by_{cat}', folder='grouped_box')
+        
+        # Get sampling parameters
+        sample_size = self.config.get('sample_size', min(2000, len(data)))
+        id_col = self.config.get('id_column')
+        batch_size = self.config.get('batch_size', 5)
+        
+        # Create optimal sample
+        sample = self._get_optimal_sample(data, id_col, sample_size)
+        self.logger.info(f"Analyzing sample of {len(sample)}/{len(data)} rows")
+        
+        # Get column lists from sample
+        num_cols = sample.select_dtypes(include='number').columns.tolist()
+        cat_cols = sample.select_dtypes(include=['object', 'category']).columns.tolist()
+
+        total_batches = (len(num_cols) + batch_size - 1) // batch_size
+        total_operations = len(num_cols) * (1 + len(cat_cols)) + len(cat_cols)
+        
+        with tqdm(total=total_operations, desc="Overall Progress") as main_pbar:
+            for batch_num in range(total_batches):
+                self._process_batch(sample, num_cols, cat_cols, batch_num, batch_size, main_pbar)
+                self._save_all_plots()
+                
         return data
+
+    def save_plot(self, fig: plt.Figure, name: str, folder: str) -> None:
+        """Thread-safe plot saving"""
+        try:
+            path = os.path.join(self.config.get('output_dir', 'analysis'), folder)
+            os.makedirs(path, exist_ok=True)
+            fig.savefig(
+                os.path.join(path, f"{name}.png"),
+                bbox_inches='tight',
+                dpi=300
+            )
+            plt.close(fig)
+        except Exception as e:
+            self.logger.error(f"Failed saving {name}: {str(e)}")
